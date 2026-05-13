@@ -24,6 +24,16 @@ For the rigorous version of how this works:
 - **[docs/METHODOLOGY.md](docs/METHODOLOGY.md)** — research question, data sources, normalization, citation guidance. Read this first if you intend to publish findings.
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — codebase tour, data model, scraper layering, how to add a shop or country.
 
+External references used in this project:
+
+- [European Central Bank — daily euro reference rates](https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html)
+- [Eurostat `earn_ses_hourly`](https://ec.europa.eu/eurostat/databrowser/view/earn_ses_hourly/) — Structure of Earnings Survey (median hourly earnings)
+- [Eurostat `prc_ppp_ind`](https://ec.europa.eu/eurostat/databrowser/view/prc_ppp_ind/) — Price Level Indices
+- [GS1 EAN-13](https://www.gs1.org/standards/barcodes/ean-upc) — canonical product-barcode standard
+- [Open Beauty Facts](https://world.openbeautyfacts.org) — community product database (CC BY-SA), used for image enrichment
+- [Playwright](https://playwright.dev/python/) — rendering backend (default)
+- [Jina Reader](https://jina.ai/reader/) — optional alternative rendering backend
+
 ## Quick start
 
 ### Prerequisites

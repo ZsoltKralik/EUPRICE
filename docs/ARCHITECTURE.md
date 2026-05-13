@@ -1,5 +1,7 @@
 # EUPRICE — Architecture
 
+> See also: [README](../README.md) · [Methodology](METHODOLOGY.md)
+
 How the system is built. Audience: contributors and the future-you trying to add a shop six months from now.
 
 For the methodological side (data sources, normalization rules), see [METHODOLOGY.md](METHODOLOGY.md).

@@ -1,8 +1,10 @@
 # EUPRICE — Methodology
 
+> See also: [README](../README.md) · [Architecture](ARCHITECTURE.md)
+
 This document describes how EUPRICE collects, normalizes, and reports cross-EU consumer prices. It is intended for two audiences: researchers and policy analysts who want to assess the validity of findings, and contributors who want to add data sources without breaking the methodology.
 
-If you cite an EUPRICE figure in published work, please follow the [citation guidance](#citation) at the end.
+If you cite an EUPRICE figure in published work, please follow the [citation guidance](#10-citation) at the end.
 
 ---
 
@@ -32,8 +34,8 @@ Online product pages from retailers operating in multiple EU countries.
 
 | Shop | Countries | Status |
 |---|---|---|
-| **DM Drogerie Markt** | DE, AT, SK, CZ, HU, PL, SI, HR, RO, BG | implemented |
-| **Tigotà** | IT | scaffold; needed for IT↔SK comparisons |
+| **[DM Drogerie Markt](https://www.dm.de)** | DE, AT, SK, CZ, HU, PL, SI, HR, RO, BG | implemented |
+| **[Tigotà](https://www.tigota.it)** | IT | scaffold; needed for IT↔SK comparisons |
 
 Retailers are chosen because they (a) operate cross-border with comparable catalogs and (b) expose structured product data (JSON-LD with `gtin13`) on detail pages, which makes EAN-based matching reliable.
 
@@ -43,14 +45,14 @@ Retailers are chosen because they (a) operate cross-border with comparable catal
 
 | Dataset | Use | Update cycle |
 |---|---|---|
-| `earn_ses_hourly` (Structure of Earnings Survey, hourly earnings) | Country median hourly wage, used in the minutes-of-work metric | Every 4 years (latest 2022) |
-| `prc_ppp_ind` (Price Level Indices) | Triangulation: do our scraped spreads agree with Eurostat's published indices? | Annual |
+| [`earn_ses_hourly`](https://ec.europa.eu/eurostat/databrowser/view/earn_ses_hourly/) (Structure of Earnings Survey, hourly earnings) | Country median hourly wage, used in the minutes-of-work metric | Every 4 years (latest 2022) |
+| [`prc_ppp_ind`](https://ec.europa.eu/eurostat/databrowser/view/prc_ppp_ind/) (Price Level Indices) | Triangulation: do our scraped spreads agree with Eurostat's published indices? | Annual |
 
-Eurostat data is pulled via the public Eurostat JSON-stat API in `scraper/core/eurostat.py` and stored in the `eurostat_pli` and `country` tables.
+Eurostat data is pulled via the public [Eurostat JSON-stat API](https://wikis.ec.europa.eu/display/EUROSTATHELP/API+-+Getting+started) in `scraper/core/eurostat.py` and stored in the `eurostat_pli` and `country` tables.
 
 ### 3.3 Currency conversion
 
-Daily euro reference rates from the **European Central Bank**, fetched at scrape time from `https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml`. The specific rate used for each conversion is stored on the `price` row (`fx_rate` column) for full audit. For non-EUR countries (CZ, HU, PL, RO, BG), the displayed EUR price reflects the rate active on the scrape date.
+Daily euro reference rates from the **[European Central Bank](https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html)**, fetched at scrape time from <https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml>. The specific rate used for each conversion is stored on the `price` row (`fx_rate` column) for full audit. For non-EUR countries (CZ, HU, PL, RO, BG), the displayed EUR price reflects the rate active on the scrape date.
 
 BGN is pegged to EUR at the convergence rate of 1.95583; this is hard-coded as a fallback when ECB omits the lev.
 
@@ -60,8 +62,8 @@ Standard and reduced (food) VAT rates per country are seeded in `db/migrations/0
 
 ## 4. Product identity — EAN-first
 
-EAN-13 barcodes are the canonical product identity. They are:
-- **Globally unique** (assigned by GS1 manufacturer registries)
+[EAN-13 barcodes](https://www.gs1.org/standards/barcodes/ean-upc) are the canonical product identity. They are:
+- **Globally unique** (assigned by [GS1](https://www.gs1.org) manufacturer registries)
 - **Language-independent** (a barcode means the same thing in Helsinki and Athens)
 - **Stable** (the same physical SKU keeps its EAN through pack-design refreshes)
 

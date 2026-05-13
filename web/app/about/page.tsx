@@ -19,12 +19,7 @@ export default function AboutPage() {
         </h1>
         <p className="mt-4 text-lg leading-relaxed text-slate-600">
           A short summary. For the complete documentation, see{" "}
-          <a
-            href="https://github.com/"
-            className="font-medium text-indigo-700 underline-offset-2 hover:underline"
-          >
-            <code>docs/METHODOLOGY.md</code>
-          </a>{" "}
+          <code className="rounded bg-slate-100 px-1.5 py-0.5 text-sm">docs/METHODOLOGY.md</code>{" "}
           in the repository.
         </p>
       </div>
@@ -56,11 +51,43 @@ export default function AboutPage() {
         <dl className="not-prose grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Source
             label="Retailer catalogs"
-            value="DM Drogerie Markt (10 countries). Tigotà (Italy) coming."
+            value={
+              <>
+                <a
+                  href="https://www.dm.de"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-indigo-700 hover:text-indigo-900"
+                >
+                  DM Drogerie Markt
+                </a>{" "}
+                (10 countries).{" "}
+                <a
+                  href="https://www.tigota.it"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-indigo-700 hover:text-indigo-900"
+                >
+                  Tigotà
+                </a>{" "}
+                (Italy) coming.
+              </>
+            }
           />
           <Source
             label="Currency"
-            value="ECB daily euro reference rates"
+            value={
+              <>
+                <a
+                  href="https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-indigo-700 hover:text-indigo-900"
+                >
+                  ECB daily euro reference rates
+                </a>
+              </>
+            }
           />
           <Source
             label="VAT"
@@ -68,11 +95,62 @@ export default function AboutPage() {
           />
           <Source
             label="Median wages"
-            value="Eurostat earn_ses_hourly (latest SES, 2022)"
+            value={
+              <>
+                Eurostat{" "}
+                <a
+                  href="https://ec.europa.eu/eurostat/databrowser/view/earn_ses_hourly/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-mono text-indigo-700 hover:text-indigo-900"
+                >
+                  earn_ses_hourly
+                </a>{" "}
+                (latest SES, 2022)
+              </>
+            }
           />
           <Source
             label="Price Level Indices"
-            value="Eurostat prc_ppp_ind (annual, for triangulation)"
+            value={
+              <>
+                Eurostat{" "}
+                <a
+                  href="https://ec.europa.eu/eurostat/databrowser/view/prc_ppp_ind/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-mono text-indigo-700 hover:text-indigo-900"
+                >
+                  prc_ppp_ind
+                </a>{" "}
+                (annual, for triangulation)
+              </>
+            }
+          />
+          <Source
+            label="Product identity"
+            value={
+              <>
+                <a
+                  href="https://www.gs1.org/standards/barcodes/ean-upc"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-indigo-700 hover:text-indigo-900"
+                >
+                  GS1 EAN-13 barcodes
+                </a>
+                ; image enrichment via{" "}
+                <a
+                  href="https://world.openbeautyfacts.org"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-indigo-700 hover:text-indigo-900"
+                >
+                  Open Beauty Facts
+                </a>{" "}
+                (CC BY-SA)
+              </>
+            }
           />
           <Source
             label="Reproducibility"
@@ -166,13 +244,13 @@ function Section({
   );
 }
 
-function Source({ label, value }: { label: string; value: string }) {
+function Source({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-soft">
       <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
         {label}
       </dt>
-      <dd className="mt-1 text-sm text-slate-700">{value}</dd>
+      <dd className="mt-1 text-sm leading-relaxed text-slate-700">{value}</dd>
     </div>
   );
 }
