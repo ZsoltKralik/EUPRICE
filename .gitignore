@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Secrets (the example file is committed)
+.env
+!.env.example
+
+# Node
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# SQLite
+db/eu_prices.db
+db/eu_prices.db-journal
+db/eu_prices.db-wal
+db/eu_prices.db-shm
+
+# Scraped HTML snapshots (can be regenerated; large)
+data/snapshots/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
