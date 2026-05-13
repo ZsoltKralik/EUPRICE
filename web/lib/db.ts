@@ -85,28 +85,26 @@ export type HistoryRow = {
   price_eur: number;
 };
 
-// Cache JSON across hot reloads in dev.
+// Lightweight mtime-keyed cache. In dev we always want to see fresh JSON when
+// the Python exporter rewrites web/data/*.json — caching by mtime means any
+// file change invalidates automatically without us restarting the dev server.
+// Files are <100 KB so even re-reading on every request would be fine; the
+// cache is just a small perf nicety for production builds.
+type CacheEntry<T> = { mtime: number; data: T[] };
 declare global {
   // eslint-disable-next-line no-var
-  var __EUPRICE_CACHE__:
-    | {
-        prices?: LatestPriceRow[];
-        products?: ProductLite[];
-        countries?: Country[];
-        pli?: EurostatPliRow[];
-        history?: HistoryRow[];
-      }
-    | undefined;
+  var __EUPRICE_CACHE__: Record<string, CacheEntry<unknown>> | undefined;
 }
-function cache() {
+function cacheStore() {
   if (!globalThis.__EUPRICE_CACHE__) globalThis.__EUPRICE_CACHE__ = {};
   return globalThis.__EUPRICE_CACHE__;
 }
 
 async function load<T>(file: string): Promise<T[]> {
+  const full = path.join(DATA_DIR, file);
+  let mtime: number;
   try {
-    const raw = await fs.readFile(path.join(DATA_DIR, file), "utf-8");
-    return JSON.parse(raw) as T[];
+    mtime = (await fs.stat(full)).mtimeMs;
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === "ENOENT") {
       throw new Error(
@@ -115,12 +113,19 @@ async function load<T>(file: string): Promise<T[]> {
     }
     throw e;
   }
+  const store = cacheStore();
+  const hit = store[file] as CacheEntry<T> | undefined;
+  if (hit && hit.mtime === mtime) {
+    return hit.data;
+  }
+  const raw = await fs.readFile(full, "utf-8");
+  const data = JSON.parse(raw) as T[];
+  store[file] = { mtime, data };
+  return data;
 }
 
 export async function listLatest(): Promise<LatestPriceRow[]> {
-  const c = cache();
-  if (!c.prices) c.prices = await load<LatestPriceRow>("prices.json");
-  return c.prices;
+  return load<LatestPriceRow>("prices.json");
 }
 
 export async function getProductLatest(productId: number): Promise<LatestPriceRow[]> {
@@ -130,27 +135,21 @@ export async function getProductLatest(productId: number): Promise<LatestPriceRo
 }
 
 export async function listProducts(): Promise<ProductLite[]> {
-  const c = cache();
-  if (!c.products) c.products = await load<ProductLite>("products.json");
-  return c.products;
+  return load<ProductLite>("products.json");
 }
 
 export async function listCountries(): Promise<Country[]> {
-  const c = cache();
-  if (!c.countries) c.countries = await load<Country>("countries.json");
-  return c.countries;
+  return load<Country>("countries.json");
 }
 
 export async function priceHistory(productId: number): Promise<HistoryRow[]> {
-  const c = cache();
-  if (!c.history) c.history = await load<HistoryRow>("history.json");
-  return c.history.filter((h) => h.product_id === productId);
+  const all = await load<HistoryRow>("history.json");
+  return all.filter((h) => h.product_id === productId);
 }
 
 export async function eurostatPli(year?: number, categoryCode?: string): Promise<EurostatPliRow[]> {
-  const c = cache();
-  if (!c.pli) c.pli = await load<EurostatPliRow>("eurostat_pli.json");
-  return c.pli.filter(
+  const all = await load<EurostatPliRow>("eurostat_pli.json");
+  return all.filter(
     (r) =>
       (year === undefined || r.year === year) &&
       (categoryCode === undefined || r.category_code === categoryCode),
