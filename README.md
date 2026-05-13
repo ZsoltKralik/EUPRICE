@@ -74,23 +74,39 @@ python -m venv .venv
 pip install -e scraper
 ```
 
-### 1b. Jina Reader API key (for JS-rendered / anti-bot fallback)
+### 1b. Choose a rendering backend
 
-`httpx` handles plain server-rendered pages directly. For pages that need JS or get blocked, the scraper falls back to [Jina Reader](https://jina.ai/reader/) — no Chromium install, works the same way on every retailer.
+`httpx` handles plain server-rendered pages directly. For SPAs like DM that hydrate via JavaScript, the scraper falls back to one of two backends. Pick at runtime via `EUPRICE_RENDER` in your `.env`:
+
+| Value | Cost | Setup | When to use |
+|---|---|---|---|
+| **`playwright`** (default) | free | one-time Chromium install | recommended for research/case-study work |
+| **`jina`** | ~$5/mo at our scale | API key only, no local install | when Playwright gets fingerprinted or you can't install Chromium |
+| **`disabled`** | free | nothing | static-HTML retailers only (skips JS-rendered pages) |
+
+**Playwright path (recommended)**:
+
+```powershell
+python -m playwright install chromium      # ~500 MB, one-time
+# in .env:  EUPRICE_RENDER=playwright
+```
+
+**Jina path** (no local browser):
 
 ```powershell
 cp .env.example .env
-# edit .env and set JINA_API_KEY=<your key>
+# edit .env:  EUPRICE_RENDER=jina
+#             JINA_API_KEY=<your key from https://jina.ai/?sui=apikey>
 ```
 
-Sanity-check it:
+Sanity-check Jina specifically:
 
 ```powershell
 python -m scraper.refresh test-jina https://www.dm.at
 # expected: "Jina OK  status=200  bytes=...."
 ```
 
-Tip: set `JINA_FORCE=1` in `.env` to route every fetch through Jina (useful if your IP starts getting blocked by a retailer).
+You can switch backends without restarting anything else — the spiders are backend-agnostic.
 
 ### 2. Initialize the DB
 
