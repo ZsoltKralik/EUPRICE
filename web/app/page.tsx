@@ -1,7 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { listLatest, listProducts, type LatestPriceRow, type ProductLite } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Products · EUPRICE",
+};
 
 function groupByProduct(rows: LatestPriceRow[]): Map<number, LatestPriceRow[]> {
   const m = new Map<number, LatestPriceRow[]>();

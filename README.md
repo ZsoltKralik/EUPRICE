@@ -1,69 +1,36 @@
 # EUPRICE
 
-Web app and case study comparing prices of everyday consumer items (drugstore, food, household) across EU countries. Real prices, real product URLs, scraped from retailer websites.
+> Cross-EU consumer price comparison, anchored on the *minutes-of-median-wage* metric.
 
-**Motivation.** Identical SKUs can be 40 %+ more expensive in lower-income EU countries than in higher-income ones — a real burden that aggregated indices (HICP, PLIs) don't surface at product level. EUPRICE collects the granular data that lets you point at one specific bottle of micellar water and ask: *why does this cost €2.45 in Vienna and €3.40 in Bratislava?*
+EUPRICE collects real shelf prices for identical SKUs (verified by EAN-13 barcode) across EU countries and reports the consumer cost in three forms: nominal EUR, VAT-exclusive EUR, and minutes of work at the country's median hourly wage. The last metric is the project's case-study headline: it converts an abstract price spread into the labor reality consumers in low-wage countries actually face.
 
-## What you maintain
+**Why this exists.** During EU travel, the project's originator noticed that identical drugstore products can cost 40 %+ more in lower-income countries than in their higher-income neighbours. EUPRICE turns that anecdote into a defensible dataset suitable for case-study work on territorial supply constraints (TSCs) at the EU policy level.
 
-One file: [`data/products.csv`](data/products.csv).
+## Status
 
-| column | example | required |
-|---|---|---|
-| `producer` | Balea | yes |
-| `name` | Mizellenwasser sensitive | yes |
-| `size_value` | 400 | yes |
-| `size_unit` | ml | yes — one of `ml`, `l`, `g`, `kg`, `piece` |
-| `category` | drugstore | yes |
-| `subcategory` | micellar_water | optional, free-form |
-| `search_hint` | balea mizellenwasser sensitive | yes — query string for the shop's site search |
-| `ean` | 4010355532688 | optional — scraper fills this in on first successful scrape |
-| `notes` |  | optional |
+- 10 sample products tracked across 10 EU countries (DM Drogerie Markt)
+- 9/10 products have verified EAN-13 codes (1 awaits cross-language fix)
+- 100 Eurostat Price Level Index rows for triangulation
+- Country median wages seeded from Eurostat
+- Sample data populated; live scraping ready to run via Playwright (free) or Jina (paid)
+- Italian retailer (Tigotà) scaffolded for IT↔SK comparison
 
-Add a row → re-run the scraper → it appears in the database. Countries and shops are seeded in DB migrations; you don't need to touch them.
+The web app at `http://localhost:3000` renders a product grid, an interactive EU choropleth, a spread leaderboard, and per-product breakdowns with the minutes-of-work chart.
 
-## Architecture
+## Documentation
 
-```
-EUPRICE/
-├── data/
-│   └── products.csv               source of truth for what to track
-├── db/
-│   ├── schema.sql                 5 tables + 1 view
-│   ├── migrations/                seed countries + shops
-│   └── eu_prices.db               (gitignored)
-├── scraper/                       Python
-│   ├── core/                      fetch, db, fx, normalize, models
-│   ├── spiders/                   one module per shop (currently: dm)
-│   ├── refresh.py                 CLI entry
-│   └── pyproject.toml
-└── web/                           Next.js (deferred — backend-first)
-```
+For the rigorous version of how this works:
 
-### Data model
+- **[docs/METHODOLOGY.md](docs/METHODOLOGY.md)** — research question, data sources, normalization, citation guidance. Read this first if you intend to publish findings.
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — codebase tour, data model, scraper layering, how to add a shop or country.
 
-```
-country       (code PK, name, currency_code, vat_standard_rate, vat_food_rate)
-producer      (id PK, name)
-shop          (id PK, code, name)
-shop_country  (shop_id, country_code, base_url)        -- "DM operates here"
-product       (id PK, ean, producer_id, name, size_value, size_unit,
-               category, subcategory, search_hint)
-price         (id PK, product_id, shop_id, country_code, parsed_at, url,
-               product_name_local, price_local, currency_code,
-               price_eur, fx_rate)
-v_latest_prices                                        -- view: latest snapshot per (product, shop, country)
-```
+## Quick start
 
-`price` is append-only: every scrape adds rows, history accumulates automatically. Ex-VAT prices are derived in the view, not stored.
+### Prerequisites
 
-### Coverage
-
-DM Drogerie Markt across 10 countries: DE, AT, SK, CZ, HU, PL, SI, HR, RO, BG. See [`db/migrations/001_seed_countries_and_shops.sql`](db/migrations/001_seed_countries_and_shops.sql).
-
-> ⚠️ DM does not operate in Italy. The original IT↔SK comparison from the motivating anecdote will require a second spider for an Italian retailer (Tigotà, Lloyds Farmacia, etc.) matched by EAN.
-
-## Setup
+- Python 3.11 or newer
+- Node.js 20 or newer
+- ~500 MB free disk for the bundled Chromium
 
 ### 1. Python scraper
 
@@ -71,86 +38,118 @@ DM Drogerie Markt across 10 countries: DE, AT, SK, CZ, HU, PL, SI, HR, RO, BG. S
 cd C:\CLAUDE\EUPRICE
 python -m venv .venv
 .venv\Scripts\Activate.ps1
-pip install -e scraper
+pip install -e .
+python -m playwright install chromium
 ```
 
-### 1b. Choose a rendering backend
-
-`httpx` handles plain server-rendered pages directly. For SPAs like DM that hydrate via JavaScript, the scraper falls back to one of two backends. Pick at runtime via `EUPRICE_RENDER` in your `.env`:
-
-| Value | Cost | Setup | When to use |
-|---|---|---|---|
-| **`playwright`** (default) | free | one-time Chromium install | recommended for research/case-study work |
-| **`jina`** | ~$5/mo at our scale | API key only, no local install | when Playwright gets fingerprinted or you can't install Chromium |
-| **`disabled`** | free | nothing | static-HTML retailers only (skips JS-rendered pages) |
-
-**Playwright path (recommended)**:
-
-```powershell
-python -m playwright install chromium      # ~500 MB, one-time
-# in .env:  EUPRICE_RENDER=playwright
-```
-
-**Jina path** (no local browser):
-
-```powershell
-cp .env.example .env
-# edit .env:  EUPRICE_RENDER=jina
-#             JINA_API_KEY=<your key from https://jina.ai/?sui=apikey>
-```
-
-Sanity-check Jina specifically:
-
-```powershell
-python -m scraper.refresh test-jina https://www.dm.at
-# expected: "Jina OK  status=200  bytes=...."
-```
-
-You can switch backends without restarting anything else — the spiders are backend-agnostic.
-
-### 2. Initialize the DB
+### 2. Initialize the database
 
 ```powershell
 python -m scraper.refresh init-db
 ```
 
-Applies the schema + the migration that seeds 10 countries and the DM shop, then loads `data/products.csv` into the `product` table.
+Applies `db/schema.sql`, seeds 10 countries (with VAT + median wage) and the DM shop, then loads `data/products.csv` into the `product` table.
 
-To verify without installing anything (stdlib only):
+### 3. Rendering backend (optional config)
+
+By default the scraper uses local Chromium via Playwright (free). If you prefer Jina:
 
 ```powershell
-python scripts/verify_schema.py
+Copy-Item .env.example .env
+# edit .env:
+#   EUPRICE_RENDER=jina
+#   JINA_API_KEY=<your key from https://jina.ai/?sui=apikey>
 ```
 
-### 3. Run the scraper
+Verify with `python -m scraper.refresh test-jina https://www.dm.at`. Stick with the default Playwright unless you have a reason.
+
+### 4. Run a scrape
 
 ```powershell
-# Slovakia + Austria + Germany, all products in the CSV
-python -m scraper.refresh run --shop dm --countries SK,AT,DE
-
-# Everywhere DM operates
+# all 10 DM countries, 5 in parallel (default)
 python -m scraper.refresh run --shop dm
 
-# Smoke test
-python -m scraper.refresh run --shop dm --countries SK,AT --limit 2
+# a subset
+python -m scraper.refresh run --shop dm --countries DE,AT,SK
+
+# smoke test
+python -m scraper.refresh run --shop dm --countries DE --limit 2
 ```
 
-Each run prints a per-(country × product) result table and appends rows to `price`. FX rates are fetched once per run from the ECB daily feed.
+Each run takes ~3-4 minutes for the full 10×10 matrix in parallel mode. Strict sequential is available via `--parallel 1`.
 
-## Adding a new shop
+### 5. Refresh the web data and start the dev server
 
-1. Add a SQL migration in `db/migrations/` inserting into `shop` and `shop_country`.
-2. Create `scraper/spiders/<shop>.py` subclassing `Spider`, implementing `scrape(product, sc) -> ScrapedPrice | None`.
-3. Register it in `SPIDER_REGISTRY` in `scraper/refresh.py`.
+```powershell
+python scripts/export_for_web.py
+cd web
+npm install
+npm run dev
+```
 
-All EUR conversion, VAT stripping, and DB writes are handled by the orchestrator — spiders are pure scrapers.
+Open <http://localhost:3000>.
 
-## Methodology notes (for the case study)
+## Without scraping — load demo data instead
 
-- **Shelf price vs ex-VAT.** Every snapshot stores the shelf price (incl. VAT, what consumers pay); the view derives the ex-VAT price. The case-study headline chart should show both — the gap between them is the VAT-policy contribution; the ex-VAT spread is the genuine territorial-pricing question.
-- **Triangulation.** Cross-check directional findings against Eurostat Price Level Indices (HICP) so the methodology is defensible at EU level.
-- **Caveat.** Online catalog prices ≠ in-store prices in some chains. Document this in the case study.
+If you want to see the web app immediately without spending any time scraping:
 
-## Note on the web app
+```powershell
+python -m scraper.refresh init-db
+python scripts/seed_sample_prices.py     # 76 plausible rows, marked with sample:// URLs
+python scripts/enrich_images.py          # download product images from Open Beauty Facts
+python scripts/export_for_web.py
+cd web && npm install && npm run dev
+```
 
-There is a Next.js scaffold under `web/`, written before this backend redesign. Its `lib/db.ts` references the old schema (`v_latest_prices` columns named `brand`, `retailer_*`, cent-based prices). It needs an update to match the new view shape — deferred until the scraper is verified end-to-end.
+This produces a fully populated UI in a few minutes, with no retailer scraping. Sample rows are clearly flagged in the source table and can be deleted with `DELETE FROM price WHERE url LIKE 'sample://%';`.
+
+## Project layout
+
+```
+data/products.csv           — what you maintain (10-row CSV)
+db/                          — schema + migrations + SQLite file
+docs/                        — METHODOLOGY + ARCHITECTURE
+scraper/                     — Python: spiders, fetcher, CLI
+scripts/                     — one-off tools (seed, enrich, export)
+web/                         — Next.js app
+```
+
+## Adding a product
+
+Append a row to [data/products.csv](data/products.csv):
+
+| column | example | required |
+|---|---|---|
+| `producer` | Balea | yes |
+| `name` | Mizellenwasser 3in1 Rose | yes |
+| `size_value` | 400 | yes |
+| `size_unit` | ml | yes (`ml`, `l`, `g`, `kg`, `piece`) |
+| `category` | drugstore | yes |
+| `subcategory` | micellar_water | optional |
+| `search_hint` | balea mizellenwasser rose | yes (query for shop search) |
+| `ean` |  | optional — scraper fills this in |
+| `notes` |  | optional |
+
+Then re-run `python -m scraper.refresh init-db` followed by `run` and `export_for_web.py`.
+
+## Adding a shop
+
+See the [Architecture guide](docs/ARCHITECTURE.md#adding-things). Briefly: add a SQL migration that inserts into `shop` and `shop_country`, create a new file under `scraper/spiders/`, register it in `SPIDER_REGISTRY` in `scraper/refresh.py`.
+
+## What you don't need
+
+- Visual Studio Build Tools — the web side avoids native modules.
+- A Jina API key — Playwright covers the same ground for free.
+- A separate database server — SQLite is the storage, in one file.
+
+## Notes
+
+- `.env.example` is held out of git when it contains a real API key. Re-add it as a template (empty values) if you publish.
+- `data/snapshots/` (archived scraped HTML) and `db/eu_prices.db` are gitignored. The DB is regenerable from migrations + scrape runs; snapshots are nice-to-have for reproducibility but recoverable on next scrape.
+- Online catalog prices ≠ in-store prices in some chains. The METHODOLOGY document elaborates.
+
+## License
+
+Code: MIT (see [LICENSE](LICENSE) once added).
+Data scraped from retailers is theirs; redistribute thoughtfully.
+Eurostat data is CC BY 4.0; cite as `Source: Eurostat (<dataset_code>)`.

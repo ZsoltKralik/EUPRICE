@@ -1,10 +1,28 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import { getProductLatest, priceHistory, type LatestPriceRow } from "@/lib/db";
+import { getProductLatest, priceHistory } from "@/lib/db";
 import PriceBarChart from "@/components/PriceBarChart";
 import MinutesOfWorkChart from "@/components/MinutesOfWorkChart";
 import PriceHistoryChart from "@/components/PriceHistoryChart";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const productId = Number(id);
+  if (!Number.isInteger(productId)) return { title: "Product · EUPRICE" };
+  const rows = await getProductLatest(productId);
+  const head = rows[0];
+  if (!head) return { title: "Product · EUPRICE" };
+  return {
+    title: `${head.producer} ${head.product_name} · EUPRICE`,
+    description: `Cross-EU prices for ${head.producer} ${head.product_name} (${head.size_value ?? ""}${head.size_unit ?? ""}) across ${rows.length} countries.`,
+  };
+}
 
 export default async function ProductPage({
   params,

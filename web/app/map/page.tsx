@@ -1,7 +1,13 @@
+import type { Metadata } from "next";
 import { listLatest, listProducts, type LatestPriceRow, type ProductLite } from "@/lib/db";
 import MapClient from "./MapClient";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Map · EUPRICE",
+  description: "Interactive EU choropleth showing price by country in EUR, ex-VAT, or minutes of median wage.",
+};
 
 export default async function MapPage({
   searchParams,

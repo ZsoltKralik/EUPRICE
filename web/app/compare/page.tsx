@@ -1,7 +1,13 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { listLatest, type LatestPriceRow } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Compare · EUPRICE",
+  description: "Products ranked by their cross-EU price spread.",
+};
 
 type Row = {
   product_id: number;
