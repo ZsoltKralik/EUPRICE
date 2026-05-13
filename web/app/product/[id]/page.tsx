@@ -16,8 +16,8 @@ export default async function ProductPage({
   if (!Number.isInteger(productId) || productId <= 0) {
     return (
       <div>
-        <Link href="/" className="text-sm text-blue-600">&larr; back</Link>
-        <h1 className="text-2xl font-semibold mt-4">Invalid product id</h1>
+        <Link href="/" className="text-sm text-indigo-700">&larr; back</Link>
+        <h1 className="mt-4 text-2xl font-semibold">Invalid product id</h1>
       </div>
     );
   }
@@ -29,9 +29,9 @@ export default async function ProductPage({
   if (rows.length === 0) {
     return (
       <div>
-        <Link href="/" className="text-sm text-blue-600">&larr; back</Link>
-        <h1 className="text-2xl font-semibold mt-4">No prices yet for product #{productId}</h1>
-        <p className="text-sm text-gray-500 mt-2">Run the scraper to populate.</p>
+        <Link href="/" className="text-sm text-indigo-700">&larr; back</Link>
+        <h1 className="mt-4 text-2xl font-semibold">No prices yet for product #{productId}</h1>
+        <p className="mt-2 text-sm text-slate-500">Run the scraper to populate.</p>
       </div>
     );
   }
@@ -46,14 +46,9 @@ export default async function ProductPage({
     incl: r.price_eur,
     ex_vat: r.price_eur_ex_vat,
   }));
-
   const minutesData = rows
     .filter((r) => r.minutes_of_work !== null && r.minutes_of_work > 0)
-    .map((r) => ({
-      country: r.country_code,
-      minutes: r.minutes_of_work as number,
-    }));
-
+    .map((r) => ({ country: r.country_code, minutes: r.minutes_of_work as number }));
   const historyForChart = history.map((h) => ({
     parsed_at: h.parsed_at,
     series: `${h.country_code}/${h.shop_code}`,
@@ -62,120 +57,150 @@ export default async function ProductPage({
 
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <Link href="/" className="text-sm text-blue-600">&larr; back</Link>
-        <Link href={`/map?product=${productId}`} className="text-sm text-blue-600">view on map →</Link>
+      <div className="mb-6 flex items-center justify-between text-sm">
+        <Link href="/" className="font-medium text-indigo-700 hover:text-indigo-900">&larr; all products</Link>
+        <Link
+          href={`/map?product=${productId}`}
+          className="font-medium text-indigo-700 hover:text-indigo-900"
+        >
+          view on map &rarr;
+        </Link>
       </div>
 
-      <header className="mt-3 mb-6 flex items-start gap-5">
-        {sample.image_url && (
+      {/* hero */}
+      <header className="mb-10 flex flex-col items-start gap-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-soft sm:flex-row sm:items-center">
+        {sample.image_url ? (
           <img
             src={sample.image_url}
             alt=""
-            className="w-28 h-28 object-contain rounded bg-white border border-gray-200 dark:border-gray-800"
+            className="h-32 w-32 rounded-xl border border-slate-100 bg-slate-50 object-contain p-2"
           />
+        ) : (
+          <div className="grid h-32 w-32 place-items-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-xs text-slate-400">
+            no image
+          </div>
         )}
-        <div>
-          <div className="text-sm text-gray-500">{sample.producer}</div>
-          <h1 className="text-3xl font-bold">{sample.product_name}</h1>
-          <div className="text-sm text-gray-500 mt-1">
+        <div className="flex-1">
+          <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{sample.producer}</div>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900">{sample.product_name}</h1>
+          <div className="mt-2 text-sm text-slate-500">
             {sample.size_value ?? "?"} {sample.size_unit ?? ""}
-            {sample.ean && ` · EAN ${sample.ean}`}
+            {sample.ean && (
+              <>
+                {" · "}EAN <span className="font-mono">{sample.ean}</span>
+              </>
+            )}
           </div>
         </div>
       </header>
 
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4">
-          <div className="text-xs uppercase text-gray-500">cheapest</div>
-          <div className="text-2xl font-bold">€{minRow.price_eur.toFixed(2)}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-300">{minRow.country_name}</div>
-        </div>
-        <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4">
-          <div className="text-xs uppercase text-gray-500">most expensive</div>
-          <div className="text-2xl font-bold">€{maxRow.price_eur.toFixed(2)}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-300">{maxRow.country_name}</div>
-        </div>
-        <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4">
-          <div className="text-xs uppercase text-gray-500">spread</div>
-          <div className="text-2xl font-bold">{spreadPct.toFixed(0)}%</div>
-          <div className="text-sm text-gray-600 dark:text-gray-300">
-            {maxRow.country_code} vs {minRow.country_code}
-          </div>
-        </div>
+      {/* stat cards */}
+      <section className="mb-10 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <StatCard
+          label="Cheapest"
+          accent="emerald"
+          value={`€${minRow.price_eur.toFixed(2)}`}
+          sub={minRow.country_name}
+        />
+        <StatCard
+          label="Most expensive"
+          accent="rose"
+          value={`€${maxRow.price_eur.toFixed(2)}`}
+          sub={maxRow.country_name}
+        />
+        <StatCard
+          label="Spread"
+          accent="indigo"
+          value={`${spreadPct.toFixed(0)}%`}
+          sub={`${maxRow.country_code} vs ${minRow.country_code}`}
+        />
       </section>
 
-      <section className="mb-10">
-        <h2 className="text-xl font-semibold mb-3">Price by country (EUR)</h2>
+      <section className="mb-10 rounded-2xl border border-slate-200 bg-white p-6 shadow-soft">
+        <h2 className="mb-1 text-lg font-semibold text-slate-900">Price by country (EUR)</h2>
+        <p className="mb-4 text-sm text-slate-500">
+          Shelf price vs ex-VAT — gap is the VAT-policy contribution.
+        </p>
         <PriceBarChart data={barData} />
       </section>
 
       {minutesData.length > 0 && (
-        <section className="mb-10">
-          <h2 className="text-xl font-semibold mb-3">Minutes of median-wage work</h2>
-          <p className="text-xs text-gray-500 mb-3">
-            Price in EUR ÷ country median hourly wage × 60. Lower-wage countries pay more in
-            real terms even when nominal price is similar.
+        <section className="mb-10 rounded-2xl border border-slate-200 bg-white p-6 shadow-soft">
+          <h2 className="mb-1 text-lg font-semibold text-slate-900">Minutes of median-wage work</h2>
+          <p className="mb-4 text-sm text-slate-500">
+            Price in EUR ÷ country median hourly wage × 60. Lower-wage countries pay more in real
+            terms even when the nominal price is similar.
           </p>
           <MinutesOfWorkChart data={minutesData} />
         </section>
       )}
 
       {historyForChart.length > rows.length && (
-        <section className="mb-10">
-          <h2 className="text-xl font-semibold mb-3">History</h2>
+        <section className="mb-10 rounded-2xl border border-slate-200 bg-white p-6 shadow-soft">
+          <h2 className="mb-4 text-lg font-semibold text-slate-900">History</h2>
           <PriceHistoryChart history={historyForChart} />
         </section>
       )}
 
-      <section>
-        <h2 className="text-xl font-semibold mb-3">Sources</h2>
+      <section className="rounded-2xl border border-slate-200 bg-white shadow-soft overflow-hidden">
+        <div className="border-b border-slate-200 px-6 py-4">
+          <h2 className="text-lg font-semibold text-slate-900">Sources</h2>
+        </div>
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-gray-500 border-b border-gray-200 dark:border-gray-800">
-              <th className="py-2 pr-3">Country</th>
-              <th className="py-2 pr-3">Shop</th>
-              <th className="py-2 pr-3 text-right">Local price</th>
-              <th className="py-2 pr-3 text-right">EUR (incl)</th>
-              <th className="py-2 pr-3 text-right">EUR (ex-VAT)</th>
-              <th className="py-2 pr-3 text-right">Min of work</th>
-              <th className="py-2 pr-3">Promo</th>
-              <th className="py-2 pr-3">Updated</th>
-              <th className="py-2 pr-3">Link</th>
+            <tr className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <th className="px-4 py-3">Country</th>
+              <th className="px-4 py-3">Shop</th>
+              <th className="px-4 py-3 text-right">Local price</th>
+              <th className="px-4 py-3 text-right">EUR (incl)</th>
+              <th className="px-4 py-3 text-right">EUR (ex-VAT)</th>
+              <th className="px-4 py-3 text-right">Min of work</th>
+              <th className="px-4 py-3">Promo</th>
+              <th className="px-4 py-3">Updated</th>
+              <th className="px-4 py-3">Link</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
+            {rows.map((r, i) => (
               <tr
                 key={`${r.country_code}-${r.shop_code}-${r.url}`}
-                className="border-b border-gray-100 dark:border-gray-900"
+                className={i % 2 === 0 ? "bg-white" : "bg-slate-50/50"}
               >
-                <td className="py-2 pr-3 font-mono">{r.country_code}</td>
-                <td className="py-2 pr-3">{r.shop_name}</td>
-                <td className="py-2 pr-3 text-right tabular-nums">
+                <td className="px-4 py-3 font-mono text-slate-700">{r.country_code}</td>
+                <td className="px-4 py-3 text-slate-700">{r.shop_name}</td>
+                <td className="px-4 py-3 text-right font-mono tabular-nums">
                   {r.price_local.toFixed(2)} {r.currency_code}
                 </td>
-                <td className="py-2 pr-3 text-right tabular-nums">€{r.price_eur.toFixed(2)}</td>
-                <td className="py-2 pr-3 text-right tabular-nums">€{r.price_eur_ex_vat.toFixed(2)}</td>
-                <td className="py-2 pr-3 text-right tabular-nums">
+                <td className="px-4 py-3 text-right font-mono font-semibold tabular-nums">
+                  €{r.price_eur.toFixed(2)}
+                </td>
+                <td className="px-4 py-3 text-right font-mono tabular-nums text-slate-600">
+                  €{r.price_eur_ex_vat.toFixed(2)}
+                </td>
+                <td className="px-4 py-3 text-right font-mono font-semibold tabular-nums text-indigo-700">
                   {r.minutes_of_work ? r.minutes_of_work.toFixed(1) : "—"}
                 </td>
-                <td className="py-2 pr-3">
+                <td className="px-4 py-3 text-xs">
                   {r.is_promo ? (
-                    <span className="text-rose-700 dark:text-rose-300">
+                    <span className="rounded bg-rose-50 px-1.5 py-0.5 font-semibold text-rose-700 ring-1 ring-rose-200">
                       −{((r.discount_pct ?? 0) * 100).toFixed(0)}%
                     </span>
                   ) : (
                     "—"
                   )}
                 </td>
-                <td className="py-2 pr-3 text-gray-500">{r.parsed_at.split("T")[0]}</td>
-                <td className="py-2 pr-3">
+                <td className="px-4 py-3 text-xs text-slate-500">{r.parsed_at.split("T")[0]}</td>
+                <td className="px-4 py-3">
                   {r.url.startsWith("sample://") ? (
-                    <span className="text-gray-400 italic">sample</span>
+                    <span className="text-xs italic text-slate-400">sample</span>
                   ) : (
-                    <a className="text-blue-600 underline" href={r.url} target="_blank" rel="noreferrer">
-                      open
+                    <a
+                      className="text-xs font-medium text-indigo-700 hover:text-indigo-900"
+                      href={r.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      open ↗
                     </a>
                   )}
                 </td>
@@ -184,6 +209,30 @@ export default async function ProductPage({
           </tbody>
         </table>
       </section>
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  sub,
+  accent,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  accent: "emerald" | "rose" | "indigo";
+}) {
+  const accentText =
+    accent === "emerald" ? "text-emerald-700" : accent === "rose" ? "text-rose-700" : "text-indigo-700";
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-soft">
+      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+      <div className={`mt-1 text-3xl font-bold tabular-nums tracking-tight ${accentText}`}>
+        {value}
+      </div>
+      <div className="mt-1 text-sm text-slate-600">{sub}</div>
     </div>
   );
 }

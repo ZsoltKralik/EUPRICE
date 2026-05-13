@@ -63,55 +63,87 @@ export default async function ComparePage() {
   }
 
   const board = buildLeaderboard(rows);
+  const maxSpread = board[0]?.spread_pct ?? 0;
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-2">Biggest spreads</h1>
-      <p className="text-gray-600 dark:text-gray-300 mb-6">
-        Products ranked by how much more they cost in their most expensive EU country vs the cheapest.
-      </p>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Biggest spreads</h1>
+        <p className="mt-2 max-w-2xl text-slate-600">
+          Products ranked by how much more they cost in their most expensive EU country vs the cheapest.
+          The minutes-of-work column shows the gap in real cost — what a low-wage worker actually pays.
+        </p>
+      </div>
+
       {board.length === 0 ? (
-        <div className="text-gray-500">No products with prices in 2+ countries yet.</div>
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500 shadow-soft">
+          No products with prices in 2+ countries yet.
+        </div>
       ) : (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-gray-500 border-b border-gray-200 dark:border-gray-800">
-              <th className="py-2 pr-3">Product</th>
-              <th className="py-2 pr-3 text-right">Cheapest</th>
-              <th className="py-2 pr-3 text-right">Most expensive</th>
-              <th className="py-2 pr-3 text-right">EUR spread</th>
-              <th className="py-2 pr-3 text-right">Min of work spread</th>
-              <th className="py-2 pr-3 text-right">Countries</th>
-            </tr>
-          </thead>
-          <tbody>
-            {board.map((r) => (
-              <tr key={r.product_id} className="border-b border-gray-100 dark:border-gray-900">
-                <td className="py-2 pr-3">
-                  <Link href={`/product/${r.product_id}`} className="text-blue-600 underline">
-                    {r.producer} — {r.name}
-                  </Link>
-                  {r.has_promo && (
-                    <span className="ml-2 text-[10px] uppercase text-rose-600">promo active</span>
-                  )}
-                </td>
-                <td className="py-2 pr-3 text-right tabular-nums">
-                  €{r.min_eur.toFixed(2)} <span className="text-gray-500">({r.min_country})</span>
-                </td>
-                <td className="py-2 pr-3 text-right tabular-nums">
-                  €{r.max_eur.toFixed(2)} <span className="text-gray-500">({r.max_country})</span>
-                </td>
-                <td className="py-2 pr-3 text-right tabular-nums font-semibold">{r.spread_pct.toFixed(0)}%</td>
-                <td className="py-2 pr-3 text-right tabular-nums">
-                  {r.min_minutes !== null && r.max_minutes !== null
-                    ? `${r.min_minutes.toFixed(0)} → ${r.max_minutes.toFixed(0)} min`
-                    : "—"}
-                </td>
-                <td className="py-2 pr-3 text-right">{r.countries}</td>
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-4 py-3">Product</th>
+                <th className="px-4 py-3 text-right">Cheapest</th>
+                <th className="px-4 py-3 text-right">Most expensive</th>
+                <th className="px-4 py-3">EUR spread</th>
+                <th className="px-4 py-3 text-right">Min of work spread</th>
+                <th className="px-4 py-3 text-right">Countries</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {board.map((r, i) => (
+                <tr
+                  key={r.product_id}
+                  className={i % 2 === 0 ? "bg-white" : "bg-slate-50/50"}
+                >
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/product/${r.product_id}`}
+                      className="font-medium text-slate-900 hover:text-indigo-700"
+                    >
+                      <span className="text-xs uppercase tracking-wide text-slate-500">{r.producer}</span>{" "}
+                      — {r.name}
+                    </Link>
+                    {r.has_promo && (
+                      <span className="ml-2 rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-rose-700 ring-1 ring-rose-200">
+                        promo
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono tabular-nums text-emerald-700">
+                    €{r.min_eur.toFixed(2)}{" "}
+                    <span className="text-slate-400">({r.min_country})</span>
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono tabular-nums text-rose-700">
+                    €{r.max_eur.toFixed(2)}{" "}
+                    <span className="text-slate-400">({r.max_country})</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="h-2 w-32 rounded-full bg-slate-100">
+                        <div
+                          className="h-full rounded-full bg-indigo-500"
+                          style={{ width: `${Math.min(100, (r.spread_pct / Math.max(maxSpread, 1)) * 100)}%` }}
+                        />
+                      </div>
+                      <span className="font-mono text-sm font-semibold tabular-nums text-slate-900">
+                        {r.spread_pct.toFixed(0)}%
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono tabular-nums text-indigo-700">
+                    {r.min_minutes !== null && r.max_minutes !== null
+                      ? `${r.min_minutes.toFixed(0)} → ${r.max_minutes.toFixed(0)} min`
+                      : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-right text-slate-600">{r.countries}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

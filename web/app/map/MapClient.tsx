@@ -7,10 +7,10 @@ import type { LatestPriceRow, ProductLite } from "@/lib/db";
 type Metric = "eur" | "ex_vat" | "minutes" | "pli";
 
 const METRICS: { id: Metric; label: string; help: string }[] = [
+  { id: "minutes", label: "Minutes of median wage", help: "Price ÷ country median hourly wage × 60. The real cost." },
   { id: "eur", label: "EUR (incl. VAT)", help: "Shelf price paid by consumers." },
   { id: "ex_vat", label: "EUR ex-VAT", help: "Strips national tax — isolates retailer/manufacturer pricing." },
-  { id: "minutes", label: "Minutes of median wage", help: "Price ÷ country median hourly wage × 60. The real burden." },
-  { id: "pli", label: "Eurostat PLI (placeholder)", help: "Official Price Level Index — for triangulation. Not yet wired in." },
+  { id: "pli", label: "Eurostat PLI (soon)", help: "Official Price Level Index — for triangulation. Not yet wired in." },
 ];
 
 export default function MapClient({
@@ -48,7 +48,7 @@ export default function MapClient({
         display = `€${value.toFixed(2)}`;
       } else if (metric === "minutes") {
         value = r.minutes_of_work;
-        if (value !== null) display = `${value.toFixed(1)} min`;
+        if (value !== null) display = `${value.toFixed(1)} min of work`;
       }
       if (value === null) continue;
       data.push({
@@ -74,14 +74,17 @@ export default function MapClient({
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-1">Cross-EU price map</h1>
-      <p className="text-gray-600 dark:text-gray-300 mb-6">
-        Same SKU, different countries. Toggle the metric to see EUR price, ex-VAT,
-        or how many minutes of median-wage work it takes to afford.
-      </p>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Cross-EU price map</h1>
+        <p className="mt-2 max-w-2xl text-slate-600">
+          Same SKU, different countries. Toggle the metric to see EUR, ex-VAT, or how many minutes
+          of median-wage work it takes to afford.
+        </p>
+      </div>
 
-      <section className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6">
-        <aside className="space-y-4">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[300px_1fr]">
+        {/* sidebar */}
+        <aside className="space-y-5 lg:sticky lg:top-20 lg:self-start">
           <ProductPicker
             products={products}
             value={productId}
@@ -91,40 +94,47 @@ export default function MapClient({
             }}
           />
           <MetricPicker value={metric} onChange={setMetric} />
-
           {product && (
-            <div className="text-xs text-gray-500 leading-relaxed">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 text-xs leading-relaxed text-slate-500 shadow-soft">
               <div>
-                <span className="font-mono">EAN:</span> {product.ean ?? "—"}
+                <span className="font-mono">EAN</span>{" "}
+                <span className="font-mono text-slate-700">{product.ean ?? "—"}</span>
               </div>
               <div className="mt-1">
-                {productPrices.length} country
-                {productPrices.length === 1 ? "" : "ies"} with data
+                {productPrices.length} countr
+                {productPrices.length === 1 ? "y" : "ies"} with data
               </div>
             </div>
           )}
         </aside>
 
-        <main className="space-y-4">
+        {/* main */}
+        <main className="space-y-5">
           {product && (
-            <div className="flex items-start gap-4 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
-              {product.image_url && (
+            <div className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-soft">
+              {product.image_url ? (
                 <img
                   src={product.image_url}
                   alt=""
-                  className="w-20 h-20 object-contain rounded bg-white border border-gray-100 dark:border-gray-800"
+                  className="h-20 w-20 rounded-lg border border-slate-100 bg-slate-50 object-contain p-1"
                 />
+              ) : (
+                <div className="grid h-20 w-20 place-items-center rounded-lg border border-dashed border-slate-200 bg-slate-50 text-xs text-slate-400">
+                  no image
+                </div>
               )}
-              <div className="flex-1">
-                <div className="text-sm text-gray-500">{product.producer}</div>
-                <div className="text-xl font-semibold">{product.name}</div>
-                <div className="text-xs text-gray-500 mt-1">
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  {product.producer}
+                </div>
+                <div className="truncate text-xl font-semibold text-slate-900">{product.name}</div>
+                <div className="mt-1 text-xs text-slate-500">
                   {product.size_value ?? "?"} {product.size_unit ?? ""}
                 </div>
               </div>
               <Link
                 href={`/product/${product.id}`}
-                className="text-sm text-blue-600 underline self-start"
+                className="self-start rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-soft hover:bg-slate-50"
               >
                 detail →
               </Link>
@@ -132,11 +142,11 @@ export default function MapClient({
           )}
 
           {mapData.length === 0 ? (
-            <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-8 text-center text-gray-500">
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center text-slate-500 shadow-soft">
               No prices yet for this product / metric.
             </div>
           ) : (
-            <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
               <EuropeMap
                 data={mapData}
                 scaleMin={minMax.min}
@@ -147,13 +157,11 @@ export default function MapClient({
             </div>
           )}
 
-          {selectedRow && (
-            <SelectedCountryCard row={selectedRow} metric={metric} />
-          )}
+          {selectedRow && <SelectedCountryCard row={selectedRow} />}
 
           <CountryTable rows={productPrices} metric={metric} />
         </main>
-      </section>
+      </div>
     </div>
   );
 }
@@ -169,13 +177,13 @@ function ProductPicker({
 }) {
   return (
     <div>
-      <label className="block text-xs uppercase tracking-wide text-gray-500 mb-1">
+      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
         Product
       </label>
       <select
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-soft focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
       >
         {products.map((p) => (
           <option key={p.id} value={p.id}>
@@ -197,22 +205,30 @@ function MetricPicker({
 }) {
   return (
     <div>
-      <label className="block text-xs uppercase tracking-wide text-gray-500 mb-1">
+      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
         Metric
       </label>
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         {METRICS.filter((m) => m.id !== "pli").map((m) => (
           <button
             key={m.id}
             onClick={() => onChange(m.id)}
-            className={`block w-full text-left rounded px-3 py-2 text-sm border ${
+            className={
               value === m.id
-                ? "border-blue-500 bg-blue-50 dark:bg-blue-950 text-blue-900 dark:text-blue-100"
-                : "border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900"
-            }`}
+                ? "block w-full rounded-xl border border-indigo-500 bg-indigo-50 px-3 py-2.5 text-left text-sm shadow-soft"
+                : "block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm shadow-soft hover:bg-slate-50"
+            }
           >
-            <div className="font-medium">{m.label}</div>
-            <div className="text-xs text-gray-500 mt-0.5">{m.help}</div>
+            <div
+              className={
+                value === m.id
+                  ? "font-semibold text-indigo-900"
+                  : "font-semibold text-slate-900"
+              }
+            >
+              {m.label}
+            </div>
+            <div className="mt-0.5 text-xs text-slate-500">{m.help}</div>
           </button>
         ))}
       </div>
@@ -220,41 +236,39 @@ function MetricPicker({
   );
 }
 
-function SelectedCountryCard({
-  row,
-  metric,
-}: {
-  row: LatestPriceRow;
-  metric: Metric;
-}) {
+function SelectedCountryCard({ row }: { row: LatestPriceRow }) {
   return (
-    <div className="rounded-lg border border-blue-300 dark:border-blue-800 bg-blue-50/40 dark:bg-blue-950/30 p-4">
+    <div className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50/60 to-white p-5 shadow-card">
       <div className="flex items-baseline justify-between gap-3">
         <div>
-          <div className="font-semibold">{row.country_name}</div>
-          <div className="text-xs text-gray-500">{row.shop_name}</div>
+          <div className="text-lg font-semibold text-slate-900">{row.country_name}</div>
+          <div className="text-xs text-slate-500">{row.shop_name}</div>
         </div>
-        <a
-          href={row.url}
-          target="_blank"
-          rel="noreferrer"
-          className="text-sm text-blue-600 underline"
-        >
-          open product page →
-        </a>
+        {row.url.startsWith("sample://") ? (
+          <span className="text-xs italic text-slate-400">sample data</span>
+        ) : (
+          <a
+            href={row.url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm font-medium text-indigo-700 hover:text-indigo-900"
+          >
+            open page →
+          </a>
+        )}
       </div>
-      <dl className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+      <dl className="mt-4 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
         <Stat label="Local" value={`${row.price_local.toFixed(2)} ${row.currency_code}`} />
         <Stat label="EUR" value={`€${row.price_eur.toFixed(2)}`} />
         <Stat label="ex-VAT" value={`€${row.price_eur_ex_vat.toFixed(2)}`} />
         <Stat
           label="Min of work"
-          value={row.minutes_of_work ? `${row.minutes_of_work.toFixed(1)}` : "—"}
+          value={row.minutes_of_work ? row.minutes_of_work.toFixed(1) : "—"}
         />
       </dl>
       {row.is_promo && (
-        <div className="mt-2 text-xs text-rose-700 dark:text-rose-300">
-          On promo: regular €{row.regular_price_eur?.toFixed(2)} (
+        <div className="mt-3 text-xs text-rose-700">
+          On promo · regular €{row.regular_price_eur?.toFixed(2)} (
           −{((row.discount_pct ?? 0) * 100).toFixed(0)}%)
         </div>
       )}
@@ -265,8 +279,10 @@ function SelectedCountryCard({
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs uppercase text-gray-500">{label}</dt>
-      <dd className="font-mono tabular-nums">{value}</dd>
+      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
+      <dd className="mt-0.5 font-mono text-base font-semibold tabular-nums text-slate-900">
+        {value}
+      </dd>
     </div>
   );
 }
@@ -286,35 +302,43 @@ function CountryTable({
     return a.price_eur - b.price_eur;
   });
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-soft">
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-gray-500 border-b border-gray-200 dark:border-gray-800">
-            <th className="py-2 pr-3">Country</th>
-            <th className="py-2 pr-3 text-right">Local</th>
-            <th className="py-2 pr-3 text-right">EUR</th>
-            <th className="py-2 pr-3 text-right">ex-VAT</th>
-            <th className="py-2 pr-3 text-right">Min of work</th>
-            <th className="py-2 pr-3">Promo</th>
+          <tr className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <th className="px-4 py-3">Country</th>
+            <th className="px-4 py-3 text-right">Local</th>
+            <th className="px-4 py-3 text-right">EUR</th>
+            <th className="px-4 py-3 text-right">ex-VAT</th>
+            <th className="px-4 py-3 text-right">Min of work</th>
+            <th className="px-4 py-3">Promo</th>
           </tr>
         </thead>
         <tbody>
-          {sorted.map((r) => (
-            <tr key={`${r.country_code}-${r.shop_code}`} className="border-b border-gray-100 dark:border-gray-900">
-              <td className="py-2 pr-3 font-mono">
-                {r.country_code} <span className="text-gray-500">{r.country_name}</span>
+          {sorted.map((r, i) => (
+            <tr
+              key={`${r.country_code}-${r.shop_code}`}
+              className={i % 2 === 0 ? "bg-white" : "bg-slate-50/50"}
+            >
+              <td className="px-4 py-3">
+                <span className="font-mono text-slate-500">{r.country_code}</span>{" "}
+                <span className="text-slate-900">{r.country_name}</span>
               </td>
-              <td className="py-2 pr-3 text-right tabular-nums">
+              <td className="px-4 py-3 text-right font-mono tabular-nums">
                 {r.price_local.toFixed(2)} {r.currency_code}
               </td>
-              <td className="py-2 pr-3 text-right tabular-nums">€{r.price_eur.toFixed(2)}</td>
-              <td className="py-2 pr-3 text-right tabular-nums">€{r.price_eur_ex_vat.toFixed(2)}</td>
-              <td className="py-2 pr-3 text-right tabular-nums">
+              <td className="px-4 py-3 text-right font-mono font-semibold tabular-nums">
+                €{r.price_eur.toFixed(2)}
+              </td>
+              <td className="px-4 py-3 text-right font-mono tabular-nums text-slate-600">
+                €{r.price_eur_ex_vat.toFixed(2)}
+              </td>
+              <td className="px-4 py-3 text-right font-mono font-semibold tabular-nums text-indigo-700">
                 {r.minutes_of_work ? r.minutes_of_work.toFixed(1) : "—"}
               </td>
-              <td className="py-2 pr-3">
+              <td className="px-4 py-3 text-xs">
                 {r.is_promo ? (
-                  <span className="text-rose-700 dark:text-rose-300">
+                  <span className="rounded bg-rose-50 px-1.5 py-0.5 font-semibold text-rose-700 ring-1 ring-rose-200">
                     −{((r.discount_pct ?? 0) * 100).toFixed(0)}%
                   </span>
                 ) : (

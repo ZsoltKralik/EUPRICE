@@ -8,18 +8,15 @@ import { numericToAlpha2 } from "@/lib/country-codes";
 export type CountryDatum = {
   country_code: string;
   country_name: string;
-  value: number;          // the metric we're coloring by
-  display: string;        // pre-formatted label (e.g. "€3.39" or "22.6 min")
-  subtitle?: string;      // optional second line in tooltip
+  value: number;          // metric to color by
+  display: string;        // pre-formatted label
+  subtitle?: string;
 };
 
 type Props = {
   data: CountryDatum[];
-  /** Highest possible value for scaling (defaults to max of data). */
-  scaleMax?: number;
-  /** Lowest possible value for scaling. */
   scaleMin?: number;
-  /** Caller-controlled selected country (alpha-2), optional. */
+  scaleMax?: number;
   selectedCode?: string;
   onSelect?: (code: string | null) => void;
 };
@@ -36,10 +33,11 @@ export default function EuropeMap({ data, scaleMin, scaleMax, selectedCode, onSe
   const values = data.map((d) => d.value);
   const min = scaleMin ?? (values.length ? Math.min(...values) : 0);
   const max = scaleMax ?? (values.length ? Math.max(...values) : 1);
-  const color = useMemo(
-    () => scaleSequential([min, max], interpolateBlues),
-    [min, max],
-  );
+  const color = useMemo(() => {
+    // Slight headroom so the lightest tracked country isn't pure white.
+    const lo = min - (max - min) * 0.15;
+    return scaleSequential([lo, max], interpolateBlues);
+  }, [min, max]);
 
   const [hover, setHover] = useState<{ x: number; y: number; datum: CountryDatum } | null>(null);
 
@@ -50,7 +48,7 @@ export default function EuropeMap({ data, scaleMin, scaleMax, selectedCode, onSe
         projectionConfig={{ center: [15, 52], scale: 600 }}
         width={780}
         height={520}
-        style={{ width: "100%", height: "auto" }}
+        style={{ width: "100%", height: "auto", background: "#fff" }}
       >
         <Geographies geography={TOPO_URL}>
           {({ geographies }) =>
@@ -58,15 +56,13 @@ export default function EuropeMap({ data, scaleMin, scaleMax, selectedCode, onSe
               const a2 = numericToAlpha2(geo.id as string | number | null | undefined);
               const datum = a2 ? byCode.get(a2) : undefined;
               const isSelected = a2 && selectedCode === a2;
-              const fill = datum
-                ? (color(datum.value) as string)
-                : "#f1f5f9"; // slate-100 for non-tracked
+              const fill = datum ? (color(datum.value) as string) : "#f1f5f9"; // slate-100
               return (
                 <Geography
                   key={geo.rsmKey}
                   geography={geo}
                   fill={fill}
-                  stroke={isSelected ? "#0f172a" : "#cbd5e1"}
+                  stroke={isSelected ? "#1e293b" : "#cbd5e1"} // slate-800 / slate-300
                   strokeWidth={isSelected ? 1.5 : 0.5}
                   style={{
                     default: { outline: "none" },
@@ -96,15 +92,18 @@ export default function EuropeMap({ data, scaleMin, scaleMax, selectedCode, onSe
 
       {hover && (
         <div
-          className="pointer-events-none fixed z-50 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm shadow-lg dark:border-gray-700 dark:bg-gray-900"
+          className="pointer-events-none fixed z-50 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-lift"
           style={{ left: hover.x + 14, top: hover.y + 14 }}
         >
-          <div className="font-semibold">{hover.datum.country_name}</div>
-          <div className="font-mono tabular-nums text-blue-700 dark:text-blue-300">
+          <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            {hover.datum.country_code}
+          </div>
+          <div className="text-sm font-semibold text-slate-900">{hover.datum.country_name}</div>
+          <div className="mt-0.5 font-mono text-base font-semibold tabular-nums text-indigo-700">
             {hover.datum.display}
           </div>
           {hover.datum.subtitle && (
-            <div className="text-xs text-gray-500 mt-0.5">{hover.datum.subtitle}</div>
+            <div className="mt-0.5 text-xs text-rose-600">{hover.datum.subtitle}</div>
           )}
         </div>
       )}
@@ -126,18 +125,18 @@ function Legend({
   const steps = 6;
   const stops = Array.from({ length: steps }, (_, i) => min + (i / (steps - 1)) * (max - min));
   return (
-    <div className="absolute bottom-2 left-2 rounded bg-white/90 dark:bg-gray-900/80 backdrop-blur px-3 py-2 text-xs">
+    <div className="absolute bottom-3 left-3 rounded-lg border border-slate-200 bg-white/95 px-3 py-2 text-xs backdrop-blur">
       <div className="flex items-center gap-1">
         {stops.map((v, i) => (
           <div
             key={i}
-            className="h-3 w-7"
+            className="h-3 w-7 rounded-sm"
             style={{ background: interpolator(v) }}
             title={v.toFixed(2)}
           />
         ))}
       </div>
-      <div className="mt-1 flex justify-between font-mono tabular-nums text-gray-500">
+      <div className="mt-1 flex justify-between font-mono tabular-nums text-slate-500">
         <span>{min.toFixed(min < 10 ? 2 : 0)}</span>
         <span>{max.toFixed(max < 10 ? 2 : 0)}</span>
       </div>
