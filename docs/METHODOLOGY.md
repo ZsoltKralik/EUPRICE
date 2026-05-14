@@ -82,6 +82,18 @@ Each scrape stores the local-language product name (`product_name_local` on the 
 - Documents what the consumer actually sees on the shelf
 - Builds a multilingual product dictionary as a side-effect, useful for later linguistic analyses
 
+### 4.3 Display names
+
+Each `product` row has two name fields:
+- `name` — the canonical name in the anchor country's language (typically German for DM products).
+- `name_en` — the English equivalent for the international audience.
+
+The web app prefers `name_en` when set, otherwise falls back to `name`. The per-scrape `product_name_local` is shown separately on the product detail page when it differs (e.g. "Local name: Elvital Color Glanz Shampoo" under the English title "Elvital / Elseve Color Vive Shampoo"). This makes the cross-language story visible rather than hidden.
+
+### 4.4 Canonical URL
+
+Each `product` row also stores a `canonical_url` — the URL of the actual retailer product page on the anchor country (DM Germany by default). This is captured automatically by the scraper from the URL it lands on after the search-and-score step. The web app uses it for "View at retailer" links, so case-study readers can verify any finding by clicking through to the source.
+
 ## 5. Price normalization
 
 For each scraped price, the system derives three views:
