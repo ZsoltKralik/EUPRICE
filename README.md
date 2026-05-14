@@ -8,15 +8,17 @@ EUPRICE collects real shelf prices for identical SKUs (verified by EAN-13 barcod
 
 ## Status
 
-- **29 products tracked**, all with verified EAN-13 codes, all with canonical retailer URLs, all with product images
-- **239 real cross-EU price observations** captured via Playwright scrapes of DM's 10 country sites — zero sample data, every row links to the actual retailer product page
-- Per-country coverage (real product pages scraped, of 29):
-  DE 29 · AT 28 · SI 25 · BG 24 · HR 24 · HU 24 · SK 24 · CZ 22 · RO 22 · PL 17
+- **19 products tracked**, all with verified EAN-13 codes, all with real product images, all with canonical retailer URLs
+- **148 real cross-EU price observations** captured via Playwright scrapes of DM's 10 country sites — zero sample data, every row links to the actual retailer product page
+- Per-country coverage (real product pages scraped, of 19):
+  AT 18 · HU 18 · DE 17 · HR 17 · SI 17 · SK 15 · BG 14 · CZ 13 · RO 11 · PL 8
 - Country median wages and VAT rates seeded for all 10 countries
 - Italian retailer (Tigotà) scaffolded for IT↔SK comparison
 - Both rendering backends wired: Playwright (default, free) and Jina Reader (paid alt)
 
-**EAN is the prerequisite**: products without a verified EAN-13 don't enter the database. This is enforced by the scraper pipeline — every product passes through an EAN-capture step on DM Germany before cross-country scraping begins. Cross-country matching is then EAN-keyed, making it immune to local-language naming variants ("Mizellenwasser" → "Micelárna voda" → "Micelarni voda" etc., all the same EAN, all linked to their real country-specific product page).
+**EAN is the prerequisite**: products without a verified EAN-13 don't enter the database. The scraper pipeline runs an EAN-capture step on DM Germany before cross-country scraping; products that fail to acquire an EAN are dropped. Cross-country matching is then EAN-keyed, immune to local-language naming variants ("Mizellenwasser" → "Micelárna voda" → "Micelarni voda" — same EAN, same DM internal SKU, real product page in each country).
+
+**Pack-guard rejects wrong-variant SKUs**: the spider refuses any candidate whose name contains multi-pack markers (`2x...`, `12x80`, `Duopack`, `Jumbopack`, `Big Pack`, `Reisegröße`, etc.) or whose parsed total size differs from the seed by more than ±15 %. After a full audit and re-scrape, the dataset has zero residual pack-size or wrong-variant contamination. See [`scripts/audit_pack_quality.py`](scripts/audit_pack_quality.py) — re-run it anytime to verify.
 
 The web app at `http://localhost:3000` renders a product grid, an interactive EU choropleth, a spread leaderboard, and per-product breakdowns with the minutes-of-work chart.
 

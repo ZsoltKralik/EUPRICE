@@ -76,12 +76,19 @@ class DMSpider(Spider):
                     log.warning("DM %s: EAN detail fetch failed for %s: %s",
                                 sc.country_code, url, e)
                     continue
-                if candidate and candidate.ean == product.ean:
+                if not candidate:
+                    continue
+                # Even on an exact EAN match, refuse multi-pack / wrong-size
+                # variants — a 2-pack has its own EAN, but some retailer pages
+                # share EAN across pack variants and we don't want to mix them.
+                if not self._passes_pack_check(candidate.product_name_local, product):
+                    log.info("DM %s: rejecting %s — pack mismatch (%s)",
+                             sc.country_code, url, candidate.product_name_local[:60])
+                    continue
+                if candidate.ean == product.ean:
                     log.info("DM %s: EAN-matched %s", sc.country_code, url)
                     return candidate
-                # Keep the closest EAN-search result as a fallback even when
-                # JSON-LD doesn't expose gtin (some country sites omit it).
-                if candidate and ean_match is None:
+                if ean_match is None:
                     ean_match = candidate
 
         # Phase 2: fall back to text search_hint
@@ -101,7 +108,12 @@ class DMSpider(Spider):
                 continue
             if not candidate:
                 continue
-            # Hard match by EAN if we have one — overrides name scoring.
+            if not self._passes_pack_check(candidate.product_name_local, product):
+                log.debug("DM %s: %s pack-rejected (%s)",
+                          sc.country_code, url, candidate.product_name_local[:60])
+                continue
+            # Hard match by EAN if we have one — overrides name scoring
+            # (only fires when EAN search above didn't already return).
             if product.ean and candidate.ean == product.ean:
                 return candidate
             score = self._match_score(candidate.product_name_local, product)
@@ -111,8 +123,7 @@ class DMSpider(Spider):
                 best = (score, candidate)
         if best is not None and best[0] >= 0.5:
             return best[1]
-        # As a last resort, accept the EAN-search top candidate even if its
-        # JSON-LD didn't carry gtin — better than no row for this country.
+        # Last resort: accept the EAN-search fallback (still pack-checked above).
         if ean_match is not None:
             log.info("DM %s: using EAN-search top candidate as fallback for %r",
                      sc.country_code, product.search_hint)
@@ -293,6 +304,73 @@ class DMSpider(Spider):
                 if t == "Product" or (isinstance(t, list) and "Product" in t):
                     return obj
         return None
+
+    # ---------------------------------------------------------------- pack guard
+
+    # Explicit multi-pack / variant indicators in the scraped product name.
+    # When the seed is a single standard unit, seeing any of these means we've
+    # matched the wrong SKU (e.g. seed wants 4.8g Labello, scrape returned
+    # 2x4.8g; seed wants 80ct wipes, scrape returned the 15ct travel size).
+    # Catches both single-digit ("2x80", "3x100") and multi-digit ("12x80",
+    # "30x19,25"). Negative lookbehind on digits/decimals prevents matching the
+    # leading digits of a single bigger number.
+    _MULTI_PACK_NUM_RE = re.compile(
+        r"(?<![\d.,])(?:[2-9]|[1-9]\d+)\s*[x×]\s*\d", re.IGNORECASE,
+    )
+    _MULTI_PACK_WORD_RE = re.compile(
+        r"\b(duopack|doppelpack|twin\s*pack|nachf(ü|u)llpack|refill\s*pack|"
+        r"tripack|big\s*pack|economy\s*pack|family\s*pack|"
+        r"reiseg(?:r(?:ö|o)(?:ß|ss)e|rosse)|travel\s*size|mini[-\s]?pack|sample\s*size)\b",
+        re.IGNORECASE,
+    )
+    _UNIT_PATTERNS = {
+        "ml": r"ml",
+        "g": r"g",
+        # German "St" / "St." / "Stk" abbreviations plus full words across EU
+        # languages. The (?!\w) lookahead stops "Sticks", "Stripes" etc. from
+        # matching the bare "st".
+        "piece": r"(?:st(?:ü|u)ck|stk\.?|st\.?(?!\w)|ks|kos|szt|buc|pcs?|tabs?)",
+    }
+
+    @classmethod
+    def _passes_pack_check(cls, scrape_name: str, product: ProductSpec) -> bool:
+        """Reject candidates whose pack structure clearly differs from the seed.
+
+        Two checks:
+          1. Multi-pack indicators ("2x4,8 g", "Duopack", "Doppelpack", etc.) — any
+             of these means we've matched a multi-unit pack while the seed is for
+             a single unit.
+          2. Total-size mismatch — when the seed has a size_value/size_unit, the
+             candidate name should contain a matching number (within ±15 %
+             tolerance). If we can't find any matching unit at all, we trust the
+             rest of the scoring and return True.
+        """
+        if not scrape_name:
+            return True
+        if cls._MULTI_PACK_NUM_RE.search(scrape_name) or cls._MULTI_PACK_WORD_RE.search(scrape_name):
+            return False
+        if not (product.size_value and product.size_unit):
+            return True
+
+        # Normalize seed to ml / g / piece.
+        seed_v = float(product.size_value)
+        seed_u = product.size_unit.lower()
+        if seed_u == "l":
+            seed_v *= 1000.0
+            seed_u = "ml"
+        elif seed_u == "kg":
+            seed_v *= 1000.0
+            seed_u = "g"
+
+        unit_pat = cls._UNIT_PATTERNS.get(seed_u, re.escape(seed_u))
+        candidates = re.findall(
+            rf"(\d+[,.]?\d*)\s*{unit_pat}\b", scrape_name, re.IGNORECASE,
+        )
+        if not candidates:
+            return True
+        nums = [float(c.replace(",", ".")) for c in candidates]
+        best_diff = min(abs(n - seed_v) / max(seed_v, 1e-6) for n in nums)
+        return best_diff <= 0.15
 
     @staticmethod
     def _match_score(scrape_name: str, product: ProductSpec) -> float:
