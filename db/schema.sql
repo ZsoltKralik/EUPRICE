@@ -82,7 +82,8 @@ CREATE TABLE IF NOT EXISTS price (
     regular_price_local REAL,                 -- non-promo reference price in local currency (NULL if not on promo)
     regular_price_eur   REAL,                 -- non-promo reference price in EUR        (NULL if not on promo)
     raw_html_sha256     TEXT,                 -- hex sha256 of the scraped HTML, archived on disk
-    raw_html_path       TEXT                  -- relative path under data/snapshots/ (gitignored)
+    raw_html_path       TEXT,                 -- relative path under data/snapshots/ (gitignored)
+    is_sample           INTEGER NOT NULL DEFAULT 0  -- 1 = wage-scaled sample row, 0 = real scraped observation
 );
 CREATE INDEX IF NOT EXISTS idx_price_product ON price(product_id);
 CREATE INDEX IF NOT EXISTS idx_price_when    ON price(parsed_at);
@@ -157,6 +158,7 @@ SELECT
     pr.price_eur,
     pr.fx_rate,
     pr.is_promo,
+    pr.is_sample,
     pr.regular_price_local,
     pr.regular_price_eur,
     CASE

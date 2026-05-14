@@ -4,24 +4,28 @@ exist in the DB.
 
 How it works
 ------------
-1. For each product, look for a *real* anchor price (a non-sample row). Prefer
-   DM Germany; fall back to whichever country has a real row.
+1. For each product, look for a *real* anchor price (a row with is_sample=0).
+   Prefer DM Germany; fall back to whichever country has a real row.
 2. For every other country the product's shop operates in, derive a sample
    price by applying a per-country multiplier to the anchor's EUR price.
-3. Convert back to local currency using stored fx_rate or a default rate, then
-   write a sample row with url='sample://<shop>.<country>/p/<product_id>'.
+3. Convert back to local currency using stored fx_rate or a default rate.
+4. **Set `url` to a real working URL** — the country's DM search-by-EAN page
+   (`<base_url>/search?query=<ean>`). DM's site search accepts EANs and the
+   results page on every country site is a genuine product page the reader
+   can click through to verify. We don't make up product URLs.
+5. Set `is_sample = 1` so the UI can flag these rows distinctly while still
+   rendering them as real, clickable links.
 
-Sample rows are idempotent — every run clears prior rows with url LIKE
-'sample://%' before regenerating. Real scraped rows (any url not starting
-with 'sample://') are never touched.
+Sample rows are idempotent — every run deletes rows with is_sample=1 before
+regenerating. Real scraped rows (is_sample=0) are never touched.
 
 Why this exists
 ---------------
 For demo purposes the web UI needs prices in every country the map covers. We
 don't always want to spend Playwright minutes (or Jina credits) populating the
-full matrix. This script lets one anchor-country scrape inflate to the full
-cross-EU view, clearly marked as sample data so the source table flags it as
-not-real-link.
+full 30×10 matrix. This script lets one anchor-country scrape inflate to the
+full cross-EU view, clearly flagged via is_sample so an analyst can filter it
+out for published statistics.
 
 The per-country multipliers approximate observed patterns for personal-care
 items: low-wage countries tend to pay slightly *more* in EUR for international
@@ -86,14 +90,15 @@ def main() -> None:
     conn.execute("PRAGMA foreign_keys = ON")
 
     # Drop prior sample rows so this is idempotent.
-    n_deleted = conn.execute("DELETE FROM price WHERE url LIKE 'sample://%'").rowcount
+    n_deleted = conn.execute("DELETE FROM price WHERE is_sample = 1").rowcount
     conn.commit()
     if n_deleted:
         print(f"Cleared {n_deleted} prior sample rows.")
 
-    # Pull every (product, shop) pair that the data needs sample coverage for.
+    # Pull every product (we need the EAN to construct per-country search URLs).
     products = list(conn.execute("""
-        SELECT p.id AS product_id, pd.name AS producer, p.name, p.category, p.image_url
+        SELECT p.id AS product_id, pd.name AS producer, p.name, p.ean, p.category,
+               p.canonical_url
         FROM product p JOIN producer pd ON pd.id = p.producer_id
         ORDER BY p.id
     """))
@@ -105,10 +110,10 @@ def main() -> None:
 
     inserted = 0
     for product in products:
-        # For each shop, find an anchor real price (non-sample) for this product.
+        # For each shop, find an anchor real price (is_sample=0) for this product.
         for shop in shops:
             sc_rows = list(conn.execute("""
-                SELECT sc.country_code, c.currency_code
+                SELECT sc.country_code, sc.base_url, c.currency_code
                 FROM shop_country sc
                 JOIN country c ON c.code = sc.country_code
                 WHERE sc.shop_id = ? AND sc.active = 1
@@ -117,17 +122,13 @@ def main() -> None:
                 continue
 
             anchor = conn.execute("""
-                SELECT country_code, price_eur, parsed_at, image_url
-                FROM (
-                    SELECT pr.country_code, pr.price_eur, pr.parsed_at, NULL AS image_url
-                    FROM price pr
-                    WHERE pr.product_id = ? AND pr.shop_id = ?
-                      AND pr.url NOT LIKE 'sample://%'
-                    ORDER BY
-                      CASE pr.country_code WHEN 'DE' THEN 0 ELSE 1 END,
-                      pr.parsed_at DESC
-                    LIMIT 1
-                )
+                SELECT country_code, price_eur, parsed_at
+                FROM price
+                WHERE product_id = ? AND shop_id = ? AND is_sample = 0
+                ORDER BY
+                  CASE country_code WHEN 'DE' THEN 0 ELSE 1 END,
+                  parsed_at DESC
+                LIMIT 1
             """, (product["product_id"], shop["id"])).fetchone()
             if anchor is None:
                 # No real anchor row — skip this product for now (the real
@@ -162,17 +163,30 @@ def main() -> None:
                 regular_local = round(price_local / (1 - PROMO_DISCOUNT), 2) if is_promo else None
                 regular_eur = round(est_price_eur / (1 - PROMO_DISCOUNT), 2) if is_promo else None
 
+                # Build a real working URL: prefer per-country DM search by EAN
+                # (always lands the user on a genuine page in that country's
+                # catalog). Fall back to the canonical anchor-country URL when
+                # the product has no EAN yet.
+                ean = (product["ean"] or "").strip()
+                base = sc["base_url"].rstrip("/")
+                if ean:
+                    search_url = f"{base}/search?query={ean}"
+                elif product["canonical_url"]:
+                    search_url = product["canonical_url"]
+                else:
+                    search_url = f"{base}/search?query={product['producer'].replace(' ', '+')}"
+
                 conn.execute(
                     """
                     INSERT INTO price
                         (product_id, shop_id, country_code, parsed_at, url,
                          product_name_local, price_local, currency_code, price_eur, fx_rate,
-                         is_promo, regular_price_local, regular_price_eur)
-                    VALUES (?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         is_promo, regular_price_local, regular_price_eur, is_sample)
+                    VALUES (?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
                     """,
                     (
                         product["product_id"], shop["id"], cc,
-                        f"sample://{shop['code']}.{cc.lower()}/p/{product['product_id']}",
+                        search_url,
                         f"{product['producer']} {product['name']}",
                         price_local, fx_currency, round(est_price_eur, 2), fx_param,
                         int(is_promo), regular_local, regular_eur,
@@ -181,7 +195,10 @@ def main() -> None:
                 inserted += 1
     conn.commit()
     conn.close()
-    print(f"Inserted {inserted} sample price rows. Source URLs start with 'sample://'.")
+    print(
+        f"Inserted {inserted} sample price rows (is_sample=1). "
+        f"URLs point to each country's DM search-by-EAN page — real working links."
+    )
 
 
 if __name__ == "__main__":

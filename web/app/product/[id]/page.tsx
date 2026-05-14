@@ -200,7 +200,17 @@ export default async function ProductPage({
                 key={`${r.country_code}-${r.shop_code}-${r.url}`}
                 className={i % 2 === 0 ? "bg-white" : "bg-slate-50/50"}
               >
-                <td className="px-4 py-3 font-mono text-slate-700">{r.country_code}</td>
+                <td className="px-4 py-3 font-mono text-slate-700">
+                  {r.country_code}
+                  {r.is_sample === 1 && (
+                    <span
+                      className="ml-1.5 rounded bg-slate-100 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-500"
+                      title="Wage-scaled sample row — link goes to that country's DM search for the EAN"
+                    >
+                      sample
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-slate-700">{r.shop_name}</td>
                 <td className="px-4 py-3 text-right font-mono tabular-nums">
                   {r.price_local.toFixed(2)} {r.currency_code}
@@ -225,18 +235,15 @@ export default async function ProductPage({
                 </td>
                 <td className="px-4 py-3 text-xs text-slate-500">{r.parsed_at.split("T")[0]}</td>
                 <td className="px-4 py-3">
-                  {r.url.startsWith("sample://") ? (
-                    <span className="text-xs italic text-slate-400">sample</span>
-                  ) : (
-                    <a
-                      className="text-xs font-medium text-indigo-700 hover:text-indigo-900"
-                      href={r.url}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      open ↗
-                    </a>
-                  )}
+                  <a
+                    className="text-xs font-medium text-indigo-700 hover:text-indigo-900"
+                    href={r.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={r.is_sample ? "Wage-scaled sample row; link points to the country's DM search for the EAN" : "Real scrape of this exact page"}
+                  >
+                    {r.is_sample ? "search ↗" : "open ↗"}
+                  </a>
                 </td>
               </tr>
             ))}

@@ -262,18 +262,15 @@ function SelectedCountryCard({ row }: { row: LatestPriceRow }) {
           <div className="text-lg font-semibold text-slate-900">{row.country_name}</div>
           <div className="text-xs text-slate-500">{row.shop_name}</div>
         </div>
-        {row.url.startsWith("sample://") ? (
-          <span className="text-xs italic text-slate-400">sample data</span>
-        ) : (
-          <a
-            href={row.url}
-            target="_blank"
-            rel="noreferrer"
-            className="text-sm font-medium text-indigo-700 hover:text-indigo-900"
-          >
-            open page →
-          </a>
-        )}
+        <a
+          href={row.url}
+          target="_blank"
+          rel="noreferrer"
+          className="text-sm font-medium text-indigo-700 hover:text-indigo-900"
+          title={row.is_sample ? "Sample row; link goes to the country's DM search for this EAN" : "Real scraped page"}
+        >
+          {row.is_sample ? "search at retailer →" : "open page →"}
+        </a>
       </div>
       <dl className="mt-4 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
         <Stat label="Local" value={`${row.price_local.toFixed(2)} ${row.currency_code}`} />

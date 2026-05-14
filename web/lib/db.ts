@@ -38,6 +38,7 @@ export type LatestPriceRow = {
   price_eur: number;
   fx_rate: number | null;
   is_promo: number;
+  is_sample: number;
   regular_price_local: number | null;
   regular_price_eur: number | null;
   discount_pct: number | null;
