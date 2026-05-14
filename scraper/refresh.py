@@ -117,6 +117,20 @@ def cmd_run(
     setup_conn = dbmod.connect()
     specs = dbmod.load_products_csv()
     product_ids = dbmod.sync_products(setup_conn, specs)
+
+    # Enrich each spec with any EAN already stored in the DB from prior scrapes.
+    # The CSV typically doesn't carry EANs (they're discovered on first scrape),
+    # but once we have one, the spider should use it for EAN-keyed search on
+    # subsequent country runs. Without this step, cross-language matching falls
+    # back to brittle name search.
+    db_eans = {
+        r["id"]: r["ean"]
+        for r in setup_conn.execute("SELECT id, ean FROM product WHERE ean IS NOT NULL")
+    }
+    for spec, pid in zip(specs, product_ids):
+        if spec.ean is None and pid in db_eans:
+            spec.ean = db_eans[pid]
+
     pairs = list(zip(specs, product_ids))
     if limit:
         pairs = pairs[:limit]
@@ -140,8 +154,8 @@ def cmd_run(
 
     workers = max(1, min(parallel, len(scs)))
     console.print(
-        f"[bold]Scraping[/bold] {len(pairs)} products × {len(scs)} countries  "
-        f"[dim]run #{run_id} · backend={Fetcher().render_backend} · parallel={workers}[/dim]"
+        f"[bold]Scraping[/bold] {len(pairs)} products x {len(scs)} countries  "
+        f"[dim]run #{run_id} | backend={Fetcher().render_backend} | parallel={workers}[/dim]"
     )
 
     started = time.monotonic()
@@ -163,13 +177,13 @@ def cmd_run(
                     country_rows = fut.result()
                 except Exception as e:  # noqa: BLE001
                     log.exception("Country %s failed: %s", cc, e)
-                    console.print(f"  [red]✗ {cc} ERROR[/red] {type(e).__name__}: {e}")
+                    console.print(f"  [red][ERR] {cc}[/red] {type(e).__name__}: {e}")
                     continue
                 results.extend(country_rows)
                 ok = sum(1 for r in country_rows if r[3] in ("ok", "promo"))
                 color = "green" if ok == len(country_rows) else "yellow"
                 console.print(
-                    f"  [{color}]✓ {cc}[/{color}] {ok}/{len(country_rows)} ok "
+                    f"  [{color}][OK] {cc}[/{color}] {ok}/{len(country_rows)} ok "
                     f"[dim]({time.monotonic() - started:5.1f}s elapsed)[/dim]"
                 )
 
@@ -198,8 +212,8 @@ def cmd_run(
     n_err = sum(1 for r in results if r[3] not in ("ok", "promo", "no match"))
     console.print(
         f"[bold]Done[/bold] in [bold]{elapsed:.1f}s[/bold]: "
-        f"[green]{n_ok}[/green] ok · [magenta]{n_promo}[/magenta] promo · "
-        f"[yellow]{n_miss}[/yellow] no-match · [red]{n_err}[/red] errors  "
+        f"[green]{n_ok}[/green] ok | [magenta]{n_promo}[/magenta] promo | "
+        f"[yellow]{n_miss}[/yellow] no-match | [red]{n_err}[/red] errors  "
         f"({len(results)} attempts)"
     )
 

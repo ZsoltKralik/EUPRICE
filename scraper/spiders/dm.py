@@ -56,31 +56,71 @@ class DMSpider(Spider):
     shop_code = "dm"
 
     def scrape(self, product: ProductSpec, sc: ShopCountry) -> Optional[ScrapedPrice]:
+        """Find this product on the shop's country site and return its price.
+
+        When the product already has a verified EAN (e.g. captured from a prior
+        DM Germany scrape), we search by EAN first — DM's site search accepts
+        EAN-13 codes and returns the exact product across every country domain.
+        This is the EAN-first strategy that makes cross-language matching
+        immune to naming variants (Elseve vs Elvital, Mizellenwasser variants,
+        etc.). Falls back to the text search_hint if EAN search misses.
+        """
+        # Phase 1: EAN search if we know the EAN
+        ean_match: Optional[ScrapedPrice] = None
+        if product.ean:
+            ean_urls = self._search(product.ean, sc)
+            for url in ean_urls[:5]:
+                try:
+                    candidate = self._scrape_detail(url, sc)
+                except Exception as e:  # noqa: BLE001
+                    log.warning("DM %s: EAN detail fetch failed for %s: %s",
+                                sc.country_code, url, e)
+                    continue
+                if candidate and candidate.ean == product.ean:
+                    log.info("DM %s: EAN-matched %s", sc.country_code, url)
+                    return candidate
+                # Keep the closest EAN-search result as a fallback even when
+                # JSON-LD doesn't expose gtin (some country sites omit it).
+                if candidate and ean_match is None:
+                    ean_match = candidate
+
+        # Phase 2: fall back to text search_hint
         urls = self._search(product.search_hint, sc)
-        if not urls:
-            log.info("DM %s: no candidates for %r", sc.country_code, product.search_hint)
+        if not urls and ean_match is None:
+            log.info("DM %s: no candidates for %r (EAN=%s)",
+                     sc.country_code, product.search_hint, product.ean)
             return None
-        # Score each candidate, return the best with a non-trivial score.
+
         best: Optional[tuple[float, ScrapedPrice]] = None
         for url in urls[:8]:
             try:
-                scrape = self._scrape_detail(url, sc)
+                candidate = self._scrape_detail(url, sc)
             except Exception as e:  # noqa: BLE001
-                log.warning("DM %s: detail fetch failed for %s: %s", sc.country_code, url, e)
+                log.warning("DM %s: detail fetch failed for %s: %s",
+                            sc.country_code, url, e)
                 continue
-            if not scrape:
+            if not candidate:
                 continue
-            score = self._match_score(scrape.product_name_local, product)
+            # Hard match by EAN if we have one — overrides name scoring.
+            if product.ean and candidate.ean == product.ean:
+                return candidate
+            score = self._match_score(candidate.product_name_local, product)
             log.debug("DM %s: candidate %s scored %.2f (%s)",
-                      sc.country_code, url, score, scrape.product_name_local)
+                      sc.country_code, url, score, candidate.product_name_local)
             if best is None or score > best[0]:
-                best = (score, scrape)
-        if best is None or best[0] < 0.5:
-            log.info("DM %s: no candidate scored well for %r (best=%.2f)",
-                     sc.country_code, product.search_hint,
-                     best[0] if best else 0.0)
-            return None
-        return best[1]
+                best = (score, candidate)
+        if best is not None and best[0] >= 0.5:
+            return best[1]
+        # As a last resort, accept the EAN-search top candidate even if its
+        # JSON-LD didn't carry gtin — better than no row for this country.
+        if ean_match is not None:
+            log.info("DM %s: using EAN-search top candidate as fallback for %r",
+                     sc.country_code, product.search_hint)
+            return ean_match
+        log.info("DM %s: no candidate scored well for %r (best=%.2f, EAN=%s)",
+                 sc.country_code, product.search_hint,
+                 best[0] if best else 0.0, product.ean)
+        return None
 
     # ---------------------------------------------------------------- search
     def _search(self, query: str, sc: ShopCountry) -> list[str]:
