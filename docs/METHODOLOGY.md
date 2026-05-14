@@ -76,6 +76,8 @@ For each tracked product:
 2. The product detail page's JSON-LD block exposes `gtin13`. This becomes the canonical EAN.
 3. Every other country is then searched by EAN directly — far more reliable than text search, and immune to cross-language naming differences ("Elseve" in IT, "Elvital" in DE, "Elseve" in NL — same EAN).
 
+**EAN as prerequisite.** Products that fail to acquire an EAN at the anchor step are excluded from the database entirely. Without an EAN we cannot guarantee cross-country comparability — different local SKU names might land us on subtly different products. The pipeline enforces this by deleting any post-capture row where `ean IS NULL` before the cross-country scrape begins. This means published statistics can never accidentally compare apples to oranges due to a name-only match.
+
 ### 4.2 Local naming
 
 Each scrape stores the local-language product name (`product_name_local` on the `price` row). This both:

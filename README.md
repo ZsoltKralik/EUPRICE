@@ -8,16 +8,15 @@ EUPRICE collects real shelf prices for identical SKUs (verified by EAN-13 barcod
 
 ## Status
 
-- **30 products** tracked across DM's 10 EU countries
-- **24/30 products** have verified EAN-13 codes captured from DM Germany JSON-LD via Playwright
-- **24/30 products** have a `canonical_url` linking to the actual retailer product page
-- **26/30 products** have local product images (`/public/images/<id>.jpg`)
-- **240 price observations** in the database (24 real DM Germany scrapes + 216 wage-scaled sample rows for the other 9 countries)
+- **29 products tracked**, all with verified EAN-13 codes, all with canonical retailer URLs, all with product images
+- **239 real cross-EU price observations** captured via Playwright scrapes of DM's 10 country sites — zero sample data, every row links to the actual retailer product page
+- Per-country coverage (real product pages scraped, of 29):
+  DE 29 · AT 28 · SI 25 · BG 24 · HR 24 · HU 24 · SK 24 · CZ 22 · RO 22 · PL 17
 - Country median wages and VAT rates seeded for all 10 countries
 - Italian retailer (Tigotà) scaffolded for IT↔SK comparison
 - Both rendering backends wired: Playwright (default, free) and Jina Reader (paid alt)
 
-The 6 unmatched products (Balea Bodylotion Aloe Vera, Balea Lippenpflegestift, Dontodent Med Care Plus, Dontodent Mundspülung, L'Oréal Elvital, Schwarzkopf Schauma) are documented edge cases of cross-language SKU naming — they need search-hint refinement based on DM Germany's actual catalog naming, not a methodology issue.
+**EAN is the prerequisite**: products without a verified EAN-13 don't enter the database. This is enforced by the scraper pipeline — every product passes through an EAN-capture step on DM Germany before cross-country scraping begins. Cross-country matching is then EAN-keyed, making it immune to local-language naming variants ("Mizellenwasser" → "Micelárna voda" → "Micelarni voda" etc., all the same EAN, all linked to their real country-specific product page).
 
 The web app at `http://localhost:3000` renders a product grid, an interactive EU choropleth, a spread leaderboard, and per-product breakdowns with the minutes-of-work chart.
 
