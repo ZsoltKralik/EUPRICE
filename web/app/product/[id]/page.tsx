@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getProductLatest, priceHistory } from "@/lib/db";
+import { displayName, getProductLatest, priceHistory } from "@/lib/db";
 import PriceBarChart from "@/components/PriceBarChart";
 import MinutesOfWorkChart from "@/components/MinutesOfWorkChart";
 import PriceHistoryChart from "@/components/PriceHistoryChart";
@@ -18,9 +18,10 @@ export async function generateMetadata({
   const rows = await getProductLatest(productId);
   const head = rows[0];
   if (!head) return { title: "Product · EUPRICE" };
+  const name = displayName(head);
   return {
-    title: `${head.producer} ${head.product_name} · EUPRICE`,
-    description: `Cross-EU prices for ${head.producer} ${head.product_name} (${head.size_value ?? ""}${head.size_unit ?? ""}) across ${rows.length} countries.`,
+    title: `${head.producer} ${name} · EUPRICE`,
+    description: `Cross-EU prices for ${head.producer} ${name} (${head.size_value ?? ""}${head.size_unit ?? ""}) across ${rows.length} countries.`,
   };
 }
 
@@ -100,7 +101,12 @@ export default async function ProductPage({
         )}
         <div className="flex-1">
           <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{sample.producer}</div>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900">{sample.product_name}</h1>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900">{displayName(sample)}</h1>
+          {sample.product_name_en && sample.product_name && sample.product_name !== sample.product_name_en && (
+            <div className="mt-1 text-sm italic text-slate-500">
+              Local name: {sample.product_name}
+            </div>
+          )}
           <div className="mt-2 text-sm text-slate-500">
             {sample.size_value ?? "?"} {sample.size_unit ?? ""}
             {sample.ean && (
@@ -109,6 +115,16 @@ export default async function ProductPage({
               </>
             )}
           </div>
+          {sample.product_canonical_url && (
+            <a
+              href={sample.product_canonical_url}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+            >
+              View at retailer ↗
+            </a>
+          )}
         </div>
       </header>
 

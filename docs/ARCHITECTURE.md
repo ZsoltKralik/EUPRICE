@@ -107,8 +107,21 @@ scrape_attempt (id PK, run_id, product_id, country_code, started_at,
                 status, error_class, error_msg, price_id)
 
 v_latest_prices (view) — latest price per (product, shop, country)
-                         with derived ex_VAT, minutes_of_work, discount_pct
+                         with derived ex_VAT, minutes_of_work, discount_pct,
+                         plus product_name_en and product_canonical_url for
+                         the web UI
 ```
+
+### Product columns explained
+
+| Column | Source | Notes |
+|---|---|---|
+| `name` | curated CSV (often German) | Canonical name; defaults to anchor-country language |
+| `name_en` | curated CSV | English translation for the international audience; preferred in the web UI when set |
+| `search_hint` | curated CSV | Query string used against the shop's site search; can be tuned per shop catalog quirks (e.g. "elvital" for DM DE, "elseve" elsewhere) |
+| `ean` | scraper (JSON-LD `gtin13`) | Canonical product identity once captured; never overwritten by name-based matching |
+| `image_url` | scraper (JSON-LD `image`) → localized to `/images/<id>.jpg` | Falls back to Open Beauty Facts when JSON-LD has none |
+| `canonical_url` | scraper (the URL it landed on) | Anchor-country product page; the web app uses this for "View at retailer" links |
 
 The `price` table is append-only: every scrape adds rows. History accumulates automatically. The `v_latest_prices` view returns the most recent row per (product, shop, country).
 

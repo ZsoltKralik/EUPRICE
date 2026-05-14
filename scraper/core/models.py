@@ -11,12 +11,14 @@ class ProductSpec(BaseModel):
     """One row from data/products.csv — the curated list of things to track."""
     producer: str
     name: str
+    name_en: Optional[str] = None
     size_value: Optional[float] = None
     size_unit: Optional[str] = None
     category: str
     subcategory: Optional[str] = None
     search_hint: str
     ean: Optional[str] = None
+    canonical_url: Optional[str] = None
     notes: Optional[str] = None
 
 

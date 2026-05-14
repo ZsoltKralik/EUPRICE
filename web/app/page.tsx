@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { listLatest, listProducts, type LatestPriceRow, type ProductLite } from "@/lib/db";
+import { displayName, listLatest, listProducts, type LatestPriceRow, type ProductLite } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -134,7 +134,7 @@ export default async function Home() {
                     {sample.producer}
                   </div>
                   <div className="mt-1 line-clamp-2 text-base font-semibold leading-snug text-slate-900">
-                    {sample.product_name}
+                    {displayName(sample)}
                   </div>
                   <div className="mt-1 text-xs text-slate-500">
                     {sample.size_value ?? "?"} {sample.size_unit ?? ""}

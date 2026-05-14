@@ -8,12 +8,16 @@ EUPRICE collects real shelf prices for identical SKUs (verified by EAN-13 barcod
 
 ## Status
 
-- 10 sample products tracked across 10 EU countries (DM Drogerie Markt)
-- 9/10 products have verified EAN-13 codes (1 awaits cross-language fix)
-- 100 Eurostat Price Level Index rows for triangulation
-- Country median wages seeded from Eurostat
-- Sample data populated; live scraping ready to run via Playwright (free) or Jina (paid)
+- **30 products** tracked across DM's 10 EU countries
+- **24/30 products** have verified EAN-13 codes captured from DM Germany JSON-LD via Playwright
+- **24/30 products** have a `canonical_url` linking to the actual retailer product page
+- **26/30 products** have local product images (`/public/images/<id>.jpg`)
+- **240 price observations** in the database (24 real DM Germany scrapes + 216 wage-scaled sample rows for the other 9 countries)
+- Country median wages and VAT rates seeded for all 10 countries
 - Italian retailer (Tigotà) scaffolded for IT↔SK comparison
+- Both rendering backends wired: Playwright (default, free) and Jina Reader (paid alt)
+
+The 6 unmatched products (Balea Bodylotion Aloe Vera, Balea Lippenpflegestift, Dontodent Med Care Plus, Dontodent Mundspülung, L'Oréal Elvital, Schwarzkopf Schauma) are documented edge cases of cross-language SKU naming — they need search-hint refinement based on DM Germany's actual catalog naming, not a methodology issue.
 
 The web app at `http://localhost:3000` renders a product grid, an interactive EU choropleth, a spread leaderboard, and per-product breakdowns with the minutes-of-work chart.
 
@@ -131,13 +135,15 @@ Append a row to [data/products.csv](data/products.csv):
 | column | example | required |
 |---|---|---|
 | `producer` | Balea | yes |
-| `name` | Mizellenwasser 3in1 Rose | yes |
+| `name` | Mizellenwasser 3in1 Rose | yes — canonical (often anchor-country / German) name |
+| `name_en` | Micellar Water 3-in-1 Rose | optional — English name; preferred in the web UI when set |
 | `size_value` | 400 | yes |
 | `size_unit` | ml | yes (`ml`, `l`, `g`, `kg`, `piece`) |
 | `category` | drugstore | yes |
 | `subcategory` | micellar_water | optional |
 | `search_hint` | balea mizellenwasser rose | yes (query for shop search) |
-| `ean` |  | optional — scraper fills this in |
+| `ean` |  | optional — scraper fills this in from JSON-LD |
+| `canonical_url` |  | optional — scraper fills this in from the matched product page |
 | `notes` |  | optional |
 
 Then re-run `python -m scraper.refresh init-db` followed by `run` and `export_for_web.py`.

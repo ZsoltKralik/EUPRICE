@@ -19,6 +19,8 @@ export type LatestPriceRow = {
   ean: string | null;
   producer: string;
   product_name: string;
+  product_name_en: string | null;
+  product_canonical_url: string | null;
   size_value: number | null;
   size_unit: string | null;
   category: string;
@@ -50,13 +52,19 @@ export type ProductLite = {
   ean: string | null;
   producer: string;
   name: string;
+  name_en: string | null;
   size_value: number | null;
   size_unit: string | null;
   category: string;
   subcategory: string | null;
   image_url: string | null;
   search_hint: string;
+  canonical_url: string | null;
 };
+
+// Re-export the client-safe displayName helper so existing imports from
+// "@/lib/db" continue to work. New code should prefer "@/lib/display".
+export { displayName } from "./display";
 
 export type Country = {
   code: string;

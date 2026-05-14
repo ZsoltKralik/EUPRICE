@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import EuropeMap, { type CountryDatum } from "@/components/EuropeMap";
+import { displayName } from "@/lib/display";
 import type { LatestPriceRow, ProductLite } from "@/lib/db";
 
 type Metric = "eur" | "ex_vat" | "minutes" | "pli";
@@ -127,17 +128,34 @@ export default function MapClient({
                 <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
                   {product.producer}
                 </div>
-                <div className="truncate text-xl font-semibold text-slate-900">{product.name}</div>
+                <div className="truncate text-xl font-semibold text-slate-900">{displayName(product)}</div>
                 <div className="mt-1 text-xs text-slate-500">
                   {product.size_value ?? "?"} {product.size_unit ?? ""}
+                  {product.ean && (
+                    <>
+                      {" · "}EAN <span className="font-mono">{product.ean}</span>
+                    </>
+                  )}
                 </div>
               </div>
-              <Link
-                href={`/product/${product.id}`}
-                className="self-start rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-soft hover:bg-slate-50"
-              >
-                detail →
-              </Link>
+              <div className="flex flex-col gap-1.5">
+                <Link
+                  href={`/product/${product.id}`}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-soft hover:bg-slate-50 whitespace-nowrap"
+                >
+                  detail →
+                </Link>
+                {product.canonical_url && (
+                  <a
+                    href={product.canonical_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 shadow-soft hover:bg-indigo-100 whitespace-nowrap"
+                  >
+                    at retailer ↗
+                  </a>
+                )}
+              </div>
             </div>
           )}
 

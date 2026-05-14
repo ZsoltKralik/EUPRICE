@@ -81,12 +81,14 @@ def load_products_csv(path: Path = PRODUCTS_CSV_PATH) -> list[ProductSpec]:
             rows.append(ProductSpec(
                 producer=row["producer"].strip(),
                 name=row["name"].strip(),
+                name_en=(row.get("name_en") or "").strip() or None,
                 size_value=float(row["size_value"]) if row.get("size_value") else None,
                 size_unit=(row.get("size_unit") or "").strip() or None,
                 category=row["category"].strip(),
                 subcategory=(row.get("subcategory") or "").strip() or None,
                 search_hint=row["search_hint"].strip(),
                 ean=(row.get("ean") or "").strip() or None,
+                canonical_url=(row.get("canonical_url") or "").strip() or None,
                 notes=(row.get("notes") or "").strip() or None,
             ))
     return rows
@@ -105,28 +107,31 @@ def sync_products(conn: sqlite3.Connection, specs: list[ProductSpec]) -> list[in
             cur = conn.execute(
                 """
                 UPDATE product
-                SET category    = ?,
-                    subcategory = ?,
-                    search_hint = ?,
-                    ean         = COALESCE(?, ean),
-                    notes       = ?
+                SET name_en       = COALESCE(?, name_en),
+                    category      = ?,
+                    subcategory   = ?,
+                    search_hint   = ?,
+                    ean           = COALESCE(?, ean),
+                    canonical_url = COALESCE(?, canonical_url),
+                    notes         = ?
                 WHERE producer_id = ? AND name = ?
                   AND COALESCE(size_value, -1) = COALESCE(?, -1)
                   AND COALESCE(size_unit, '')  = COALESCE(?, '')
                 """,
-                (s.category, s.subcategory, s.search_hint, s.ean, s.notes,
+                (s.name_en, s.category, s.subcategory, s.search_hint, s.ean,
+                 s.canonical_url, s.notes,
                  producer_id, s.name, s.size_value, s.size_unit),
             )
             if cur.rowcount == 0:
                 cur = conn.execute(
                     """
                     INSERT INTO product
-                        (ean, producer_id, name, size_value, size_unit,
-                         category, subcategory, search_hint, notes)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        (ean, producer_id, name, name_en, size_value, size_unit,
+                         category, subcategory, search_hint, canonical_url, notes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (s.ean, producer_id, s.name, s.size_value, s.size_unit,
-                     s.category, s.subcategory, s.search_hint, s.notes),
+                    (s.ean, producer_id, s.name, s.name_en, s.size_value, s.size_unit,
+                     s.category, s.subcategory, s.search_hint, s.canonical_url, s.notes),
                 )
                 ids.append(cur.lastrowid)
             else:
@@ -159,6 +164,14 @@ def attach_image_to_product(conn: sqlite3.Connection, product_id: int, image_url
     conn.execute(
         "UPDATE product SET image_url = ? WHERE id = ? AND (image_url IS NULL OR image_url = '')",
         (image_url, product_id),
+    )
+
+
+def attach_canonical_url_to_product(conn: sqlite3.Connection, product_id: int, url: str) -> None:
+    """Set canonical_url on a product if not already set. Typically the DM Germany page URL."""
+    conn.execute(
+        "UPDATE product SET canonical_url = ? WHERE id = ? AND (canonical_url IS NULL OR canonical_url = '')",
+        (url, product_id),
     )
 
 

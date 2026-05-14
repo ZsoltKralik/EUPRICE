@@ -45,18 +45,20 @@ CREATE TABLE IF NOT EXISTS shop_country (
 -- A product, keyed by EAN once we discover it. EAN is nullable so we can add a
 -- row from a curated list before the first scrape has resolved it.
 CREATE TABLE IF NOT EXISTS product (
-    id          INTEGER PRIMARY KEY,
-    ean         TEXT UNIQUE,
-    producer_id INTEGER NOT NULL REFERENCES producer(id),
-    name        TEXT NOT NULL,
-    size_value  REAL,
-    size_unit   TEXT,                          -- 'ml','g','l','kg','piece'
-    category    TEXT NOT NULL,
-    subcategory TEXT,
-    search_hint TEXT NOT NULL,                 -- query string for shop site search
-    image_url   TEXT,                          -- best image URL discovered by the spider (JSON-LD)
-    notes       TEXT,
-    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    id            INTEGER PRIMARY KEY,
+    ean           TEXT UNIQUE,
+    producer_id   INTEGER NOT NULL REFERENCES producer(id),
+    name          TEXT NOT NULL,                 -- canonical name (often anchor-country / German)
+    name_en       TEXT,                          -- English name for international audiences
+    size_value    REAL,
+    size_unit     TEXT,                          -- 'ml','g','l','kg','piece'
+    category      TEXT NOT NULL,
+    subcategory   TEXT,
+    search_hint   TEXT NOT NULL,                 -- query string for shop site search
+    image_url     TEXT,                          -- best image URL discovered by the spider (JSON-LD)
+    canonical_url TEXT,                          -- anchor-country product page URL (most often DM Germany)
+    notes         TEXT,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(producer_id, name, size_value, size_unit)
 );
 
@@ -137,6 +139,8 @@ SELECT
     p.ean,
     pd.name                                     AS producer,
     p.name                                      AS product_name,
+    p.name_en                                   AS product_name_en,
+    p.canonical_url                             AS product_canonical_url,
     p.size_value,
     p.size_unit,
     p.category,

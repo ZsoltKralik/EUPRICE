@@ -1,13 +1,17 @@
-"""Fill in `product.ean` for rows where it's still NULL, using the DM Germany
-spider with the configured render backend (typically Playwright).
+"""Fill in `product.ean`, `product.image_url`, and `product.canonical_url` for
+rows missing them, using the DM Germany spider with the configured render
+backend (typically Playwright).
 
 For each EAN-less product:
   1. Run the DM spider against Germany (largest catalog, most reliable anchor).
-  2. Take the EAN, image_url, and local product name from JSON-LD.
-  3. Write back to product.ean and product.image_url.
+  2. Take the EAN, image_url, canonical product URL, and local product name
+     from JSON-LD on the matching DM detail page.
+  3. Write back to product.ean / image_url / canonical_url (each only if NULL,
+     so existing values are never clobbered).
 
 Why DM Germany specifically: same SKU IDs across all DM country sites, so once
-DE has the EAN every other country can EAN-search for it later.
+DE has the EAN every other country can EAN-search for it later. The canonical
+URL also lets the web app deep-link readers to the original product page.
 """
 from __future__ import annotations
 
@@ -35,6 +39,8 @@ def main() -> None:
                p.category, p.subcategory, p.search_hint
         FROM product p JOIN producer pd ON pd.id = p.producer_id
         WHERE p.ean IS NULL
+           OR p.image_url IS NULL
+           OR p.canonical_url IS NULL
         ORDER BY p.id
     """))
     if not rows:
@@ -65,28 +71,33 @@ def main() -> None:
             except Exception as e:
                 print(f"  ! {label:<50}  error {type(e).__name__}: {e}")
                 continue
-            if scrape is None or not scrape.ean:
-                print(f"  - {label:<50}  no confident match / no EAN on page")
+            if scrape is None:
+                print(f"  - {label:<50}  no confident match")
                 continue
 
             # Attach EAN (skip if another product already owns it)
-            taken = conn.execute(
-                "SELECT id FROM product WHERE ean = ? AND id <> ?",
-                (scrape.ean, r["id"]),
-            ).fetchone()
-            if taken is not None:
-                print(f"  ! {label:<50}  EAN {scrape.ean} already owned by product {taken[0]}")
-                continue
-            conn.execute(
-                "UPDATE product SET ean = ? WHERE id = ?", (scrape.ean, r["id"])
-            )
+            if scrape.ean:
+                taken = conn.execute(
+                    "SELECT id FROM product WHERE ean = ? AND id <> ?",
+                    (scrape.ean, r["id"]),
+                ).fetchone()
+                if taken is None:
+                    conn.execute(
+                        "UPDATE product SET ean = ? WHERE id = ? AND ean IS NULL",
+                        (scrape.ean, r["id"]),
+                    )
             if scrape.image_url:
                 conn.execute(
                     "UPDATE product SET image_url = ? WHERE id = ? AND image_url IS NULL",
                     (scrape.image_url, r["id"]),
                 )
-            print(f"  + {label:<50}  EAN {scrape.ean}  "
-                  f"({scrape.product_name_local[:32]})")
+            # Always store the canonical (DM Germany) URL we landed on.
+            conn.execute(
+                "UPDATE product SET canonical_url = ? WHERE id = ? AND canonical_url IS NULL",
+                (scrape.url, r["id"]),
+            )
+            print(f"  + {label:<50}  EAN {scrape.ean or '(?)':<14}  "
+                  f"<- {scrape.product_name_local[:30]}")
             success += 1
     finally:
         spider.close()

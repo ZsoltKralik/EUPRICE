@@ -38,8 +38,10 @@ def main() -> None:
 
     # All products (including those with no prices yet)
     files["products.json"] = dump(conn.execute("""
-        SELECT p.id, p.ean, pd.name AS producer, p.name, p.size_value, p.size_unit,
-               p.category, p.subcategory, p.image_url, p.search_hint
+        SELECT p.id, p.ean, pd.name AS producer, p.name, p.name_en,
+               p.size_value, p.size_unit,
+               p.category, p.subcategory, p.image_url, p.search_hint,
+               p.canonical_url
         FROM product p
         JOIN producer pd ON pd.id = p.producer_id
         ORDER BY pd.name, p.name

@@ -103,19 +103,19 @@ def main() -> None:
 
     conn = sqlite3.connect(DB)
     conn.row_factory = sqlite3.Row
+    # Only enrich products that don't already have an image_url. The Playwright
+    # capture-from-retailer path is the authoritative source; OBF is a backstop.
     rows = list(conn.execute("""
         SELECT p.id, pd.name AS producer, p.name, p.category, p.ean
         FROM product p JOIN producer pd ON pd.id = p.producer_id
+        WHERE p.image_url IS NULL
         ORDER BY p.id
     """))
-    print(f"Enriching images for {len(rows)} products.\n")
+    print(f"Enriching images for {len(rows)} products without one.\n")
 
-    # Wipe EANs we previously auto-attached: the loose matching tagged the wrong SKUs.
-    # Real scrapes will repopulate canonical EANs from retailer JSON-LD.
-    cleared = conn.execute("UPDATE product SET ean = NULL WHERE ean IS NOT NULL").rowcount
-    if cleared:
-        print(f"Cleared {cleared} previously-attached EANs.\n")
-
+    # NOTE: this script never clears existing EANs (legacy behaviour removed —
+    # Playwright captures from real retailer JSON-LD are authoritative).
+    # It also never clears existing image_url; only fills in NULLs.
     enriched = 0
     with httpx.Client() as client:
         for r in rows:
@@ -139,9 +139,7 @@ def main() -> None:
                 if res is not None:
                     break
             if res is None:
-                # Clear any stale image_url left over from a previous looser run.
-                conn.execute("UPDATE product SET image_url = NULL WHERE id = ?", (r["id"],))
-                print(f"  - {full_query[:50]:<50}  no confident match")
+                print(f"  - {full_query[:50]:<50}  no confident match (keeping existing)")
                 continue
 
             dest = IMAGES_DIR / f"{r['id']}.jpg"
@@ -151,7 +149,7 @@ def main() -> None:
 
             local_path = f"/images/{r['id']}.jpg"
             conn.execute(
-                "UPDATE product SET image_url = ? WHERE id = ?",
+                "UPDATE product SET image_url = ? WHERE id = ? AND image_url IS NULL",
                 (local_path, r["id"]),
             )
             print(f"  + {full_query[:50]:<50}  <- {res['name'][:32]}  (score {res['score']:.2f})")

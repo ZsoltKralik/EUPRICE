@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { listLatest, type LatestPriceRow } from "@/lib/db";
+import { displayName, listLatest, type LatestPriceRow } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +13,7 @@ type Row = {
   product_id: number;
   producer: string;
   name: string;
+  name_en: string | null;
   countries: number;
   min_eur: number;
   max_eur: number;
@@ -40,6 +41,7 @@ function buildLeaderboard(rows: LatestPriceRow[]): Row[] {
       product_id: pid,
       producer: group[0].producer,
       name: group[0].product_name,
+      name_en: group[0].product_name_en,
       countries: group.length,
       min_eur: minR.price_eur,
       max_eur: maxR.price_eur,
@@ -110,7 +112,7 @@ export default async function ComparePage() {
                       className="font-medium text-slate-900 hover:text-indigo-700"
                     >
                       <span className="text-xs uppercase tracking-wide text-slate-500">{r.producer}</span>{" "}
-                      — {r.name}
+                      — {displayName({ name: r.name, name_en: r.name_en })}
                     </Link>
                     {r.has_promo && (
                       <span className="ml-2 rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-rose-700 ring-1 ring-rose-200">
