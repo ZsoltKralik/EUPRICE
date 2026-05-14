@@ -326,11 +326,19 @@ class DMSpider(Spider):
     _UNIT_PATTERNS = {
         "ml": r"ml",
         "g": r"g",
-        # German "St" / "St." / "Stk" abbreviations plus full words across EU
-        # languages. The (?!\w) lookahead stops "Sticks", "Stripes" etc. from
-        # matching the bare "st".
-        "piece": r"(?:st(?:ü|u)ck|stk\.?|st\.?(?!\w)|ks|kos|szt|buc|pcs?|tabs?)",
+        # Piece-count abbreviations across the EU languages we scrape. The
+        # (?!\w) lookahead stops "Sticks", "Stripes" etc. from matching the
+        # bare "st". Includes:
+        #   stück/stuck/stk/st (DE/AT)
+        #   ks (CZ/SK)            kom (HR)        kos (SI)
+        #   szt (PL)              buc (RO)        db (HU)
+        #   бр / бр. (BG, Cyrillic)
+        #   pcs / pc / tabs / pieces (EN)
+        "piece": r"(?:st(?:ü|u)ck|stk\.?|st\.?(?!\w)|ks|kos|kom|szt|buc|db|бр\.?|pieces?|pcs?|tabs?)",
     }
+    # Units that signal a liquid / cream / weighted product — used to detect
+    # category mismatch when the seed expects piece-count items.
+    _VOLUME_OR_WEIGHT_RE = re.compile(r"(?<![\d.,])\d+[,.]?\d*\s*(?:ml|l|g|kg)\b", re.IGNORECASE)
 
     @classmethod
     def _passes_pack_check(cls, scrape_name: str, product: ProductSpec) -> bool:
@@ -351,6 +359,18 @@ class DMSpider(Spider):
             return False
         if not (product.size_value and product.size_unit):
             return True
+
+        # Category mismatch: seed expects piece-count, scrape only carries
+        # weight/volume units (no piece marker anywhere). This catches the
+        # "babylove Feuchttücher (piece seed) -> babylove baby shampoo 250ml"
+        # class of wrong-product-line matches.
+        if product.size_unit.lower() == "piece":
+            has_piece = bool(re.search(
+                rf"(\d+[,.]?\d*)\s*{cls._UNIT_PATTERNS['piece']}\b",
+                scrape_name, re.IGNORECASE,
+            ))
+            if not has_piece and cls._VOLUME_OR_WEIGHT_RE.search(scrape_name):
+                return False
 
         # Normalize seed to ml / g / piece.
         seed_v = float(product.size_value)
