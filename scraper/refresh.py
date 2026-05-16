@@ -118,18 +118,24 @@ def cmd_run(
     specs = dbmod.load_products_csv()
     product_ids = dbmod.sync_products(setup_conn, specs)
 
-    # Enrich each spec with any EAN already stored in the DB from prior scrapes.
-    # The CSV typically doesn't carry EANs (they're discovered on first scrape),
-    # but once we have one, the spider should use it for EAN-keyed search on
-    # subsequent country runs. Without this step, cross-language matching falls
-    # back to brittle name search.
-    db_eans = {
-        r["id"]: r["ean"]
-        for r in setup_conn.execute("SELECT id, ean FROM product WHERE ean IS NOT NULL")
+    # Enrich each spec with any EAN / canonical_url already stored in the DB.
+    # The CSV typically doesn't carry them (they're discovered on first scrape),
+    # but once we have them, the spider uses both as cross-country anchors:
+    # EAN-13 is the strongest identity claim; the DM internal SKU embedded in
+    # canonical_url is a strong secondary signal (DM uses the same /p/d/<sku>/
+    # id across all its country domains for the same physical product).
+    db_meta = {
+        r["id"]: (r["ean"], r["canonical_url"])
+        for r in setup_conn.execute(
+            "SELECT id, ean, canonical_url FROM product"
+        )
     }
     for spec, pid in zip(specs, product_ids):
-        if spec.ean is None and pid in db_eans:
-            spec.ean = db_eans[pid]
+        ean, canon = db_meta.get(pid, (None, None))
+        if spec.ean is None and ean:
+            spec.ean = ean
+        if spec.canonical_url is None and canon:
+            spec.canonical_url = canon
 
     pairs = list(zip(specs, product_ids))
     if limit:

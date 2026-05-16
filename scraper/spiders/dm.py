@@ -55,20 +55,51 @@ PRODUCT_CARD_SELECTORS = [
 class DMSpider(Spider):
     shop_code = "dm"
 
+    # DM URL pattern: https://www.dm.<tld>/p/d/<NNNN>/<slug>
+    # The internal SKU id is the same across all DM country domains for the
+    # same physical product. e.g. Nivea Soft Creme 200 ml jar is /p/d/1441732/
+    # on dm.de, dm.at, dm.ro, dm.si — even though the JSON-LD gtin13 sometimes
+    # differs by country.
+    _DM_SKU_RE = re.compile(r"/p/d/(\d+)/", re.IGNORECASE)
+
+    @classmethod
+    def _extract_dm_sku(cls, url: Optional[str]) -> Optional[str]:
+        if not url:
+            return None
+        m = cls._DM_SKU_RE.search(url)
+        return m.group(1) if m else None
+
     def scrape(self, product: ProductSpec, sc: ShopCountry) -> Optional[ScrapedPrice]:
         """Find this product on the shop's country site and return its price.
 
-        When the product already has a verified EAN (e.g. captured from a prior
-        DM Germany scrape), we search by EAN first — DM's site search accepts
-        EAN-13 codes and returns the exact product across every country domain.
-        This is the EAN-first strategy that makes cross-language matching
-        immune to naming variants (Elseve vs Elvital, Mizellenwasser variants,
-        etc.). Falls back to the text search_hint if EAN search misses.
+        Strict methodology — to keep cross-country price comparisons honest, a
+        row is inserted ONLY when one of these acceptance criteria is met,
+        from strongest to weakest:
+
+          (a) The candidate page's JSON-LD gtin13 equals the seed EAN. Hard
+              identity match; pack-guard is a safety net only.
+
+          (b) The candidate URL contains the same DM internal SKU id as the
+              seed's canonical_url (the anchor-country page). DM uses one
+              `/p/d/<NNNN>/` id per physical product across all country
+              domains; same SKU id is a strong "same product" signal even
+              when the JSON-LD EAN happens to differ. Pack-guard still
+              required so multi-pack variants are rejected.
+
+          (c) No seed EAN exists at all — we fall back to scored text search.
+              This runs only on the anchor-country bootstrap before any EAN
+              is known.
+
+        We do NOT accept "looked plausible, EAN/SKU didn't match" fallbacks.
+        Missing observations are correct when no country page actually carries
+        the seed identity.
         """
-        # Phase 1: EAN search if we know the EAN
-        ean_match: Optional[ScrapedPrice] = None
+        seed_sku = self._extract_dm_sku(product.canonical_url)
+
+        # Phase 1: EAN search if we know the EAN.
         if product.ean:
             ean_urls = self._search(product.ean, sc)
+            sku_match: Optional[ScrapedPrice] = None
             for url in ean_urls[:5]:
                 try:
                     candidate = self._scrape_detail(url, sc)
@@ -78,24 +109,59 @@ class DMSpider(Spider):
                     continue
                 if not candidate:
                     continue
-                # Even on an exact EAN match, refuse multi-pack / wrong-size
-                # variants — a 2-pack has its own EAN, but some retailer pages
-                # share EAN across pack variants and we don't want to mix them.
+                # Pack-guard first — multi-pack/wrong-size variants are rejected
+                # even on otherwise-perfect identity matches.
                 if not self._passes_pack_check(candidate.product_name_local, product):
                     log.info("DM %s: rejecting %s — pack mismatch (%s)",
                              sc.country_code, url, candidate.product_name_local[:60])
                     continue
+                # (a) EAN identity match — strongest signal, return immediately.
                 if candidate.ean == product.ean:
                     log.info("DM %s: EAN-matched %s", sc.country_code, url)
                     return candidate
-                if ean_match is None:
-                    ean_match = candidate
+                # (b) DM internal SKU match — accept if no EAN candidate emerges.
+                cand_sku = self._extract_dm_sku(candidate.url)
+                if seed_sku and cand_sku == seed_sku and sku_match is None:
+                    sku_match = candidate
 
-        # Phase 2: fall back to text search_hint
+            # Try text search too — DM's site search sometimes prefers country
+            # title over EAN index, and the EAN/SKU criteria still apply.
+            urls = self._search(product.search_hint, sc)
+            for url in urls[:8]:
+                try:
+                    candidate = self._scrape_detail(url, sc)
+                except Exception as e:  # noqa: BLE001
+                    log.warning("DM %s: detail fetch failed for %s: %s",
+                                sc.country_code, url, e)
+                    continue
+                if not candidate:
+                    continue
+                if not self._passes_pack_check(candidate.product_name_local, product):
+                    continue
+                if candidate.ean == product.ean:
+                    log.info("DM %s: EAN-matched via text search %s",
+                             sc.country_code, url)
+                    return candidate
+                cand_sku = self._extract_dm_sku(candidate.url)
+                if seed_sku and cand_sku == seed_sku and sku_match is None:
+                    sku_match = candidate
+
+            if sku_match is not None:
+                log.info("DM %s: DM-SKU-matched %s (seed sku=%s, scraped ean=%s)",
+                         sc.country_code, sku_match.url, seed_sku, sku_match.ean)
+                return sku_match
+
+            log.info("DM %s: no page carries EAN %s or DM sku %s — skipping (was %r)",
+                     sc.country_code, product.ean, seed_sku, product.search_hint)
+            return None
+
+        # Phase 2: seed has no EAN at all — fall back to scored text search.
+        # This path runs only on the anchor-country bootstrap before the EAN
+        # is known. Pack-guard + producer-token + ≥0.5 name overlap required.
         urls = self._search(product.search_hint, sc)
-        if not urls and ean_match is None:
-            log.info("DM %s: no candidates for %r (EAN=%s)",
-                     sc.country_code, product.search_hint, product.ean)
+        if not urls:
+            log.info("DM %s: no candidates for %r (no seed EAN)",
+                     sc.country_code, product.search_hint)
             return None
 
         best: Optional[tuple[float, ScrapedPrice]] = None
@@ -112,10 +178,6 @@ class DMSpider(Spider):
                 log.debug("DM %s: %s pack-rejected (%s)",
                           sc.country_code, url, candidate.product_name_local[:60])
                 continue
-            # Hard match by EAN if we have one — overrides name scoring
-            # (only fires when EAN search above didn't already return).
-            if product.ean and candidate.ean == product.ean:
-                return candidate
             score = self._match_score(candidate.product_name_local, product)
             log.debug("DM %s: candidate %s scored %.2f (%s)",
                       sc.country_code, url, score, candidate.product_name_local)
@@ -123,14 +185,9 @@ class DMSpider(Spider):
                 best = (score, candidate)
         if best is not None and best[0] >= 0.5:
             return best[1]
-        # Last resort: accept the EAN-search fallback (still pack-checked above).
-        if ean_match is not None:
-            log.info("DM %s: using EAN-search top candidate as fallback for %r",
-                     sc.country_code, product.search_hint)
-            return ean_match
-        log.info("DM %s: no candidate scored well for %r (best=%.2f, EAN=%s)",
+        log.info("DM %s: no candidate scored well for %r (best=%.2f)",
                  sc.country_code, product.search_hint,
-                 best[0] if best else 0.0, product.ean)
+                 best[0] if best else 0.0)
         return None
 
     # ---------------------------------------------------------------- search
@@ -336,22 +393,59 @@ class DMSpider(Spider):
         #   pcs / pc / tabs / pieces (EN)
         "piece": r"(?:st(?:ü|u)ck|stk\.?|st\.?(?!\w)|ks|kos|kom|szt|buc|db|бр\.?|pieces?|pcs?|tabs?)",
     }
-    # Units that signal a liquid / cream / weighted product — used to detect
-    # category mismatch when the seed expects piece-count items.
-    _VOLUME_OR_WEIGHT_RE = re.compile(r"(?<![\d.,])\d+[,.]?\d*\s*(?:ml|l|g|kg)\b", re.IGNORECASE)
+    # Category-specific patterns. A "category" is one of {volume, weight, piece};
+    # within volume ml↔l and within weight g↔kg are convertible, but crossing
+    # the boundary (ml vs g vs piece) is a hard mismatch.
+    _VOLUME_RE = re.compile(r"(?<![\d.,])\d+[,.]?\d*\s*(?:ml|l(?:iter)?)\b", re.IGNORECASE)
+    _WEIGHT_RE = re.compile(r"(?<![\d.,])\d+[,.]?\d*\s*(?:g(?:ramm)?|kg)\b", re.IGNORECASE)
+    # Piece marker pattern must NOT pull in the trailing "l" in "100 ml" as
+    # "l" alone, so we keep this list explicit and the ml/g patterns above
+    # gate the "volume vs weight vs piece" decision.
+    _PIECE_RE = re.compile(
+        r"(?<![\d.,])\d+[,.]?\d*\s*"
+        r"(?:st(?:ü|u)ck|stk\.?|st\.?(?!\w)|ks|kos|kom|szt|buc|db|бр\.?|pieces?|pcs?|tabs?)\b",
+        re.IGNORECASE,
+    )
+
+    @classmethod
+    def _seed_category(cls, unit: str) -> str:
+        u = (unit or "").lower()
+        if u in ("ml", "l"):
+            return "volume"
+        if u in ("g", "kg"):
+            return "weight"
+        if u == "piece":
+            return "piece"
+        return "other"
+
+    @classmethod
+    def _scrape_categories(cls, name: str) -> set[str]:
+        cats: set[str] = set()
+        if cls._VOLUME_RE.search(name):
+            cats.add("volume")
+        if cls._WEIGHT_RE.search(name):
+            cats.add("weight")
+        if cls._PIECE_RE.search(name):
+            cats.add("piece")
+        return cats
 
     @classmethod
     def _passes_pack_check(cls, scrape_name: str, product: ProductSpec) -> bool:
         """Reject candidates whose pack structure clearly differs from the seed.
 
-        Two checks:
-          1. Multi-pack indicators ("2x4,8 g", "Duopack", "Doppelpack", etc.) — any
-             of these means we've matched a multi-unit pack while the seed is for
-             a single unit.
-          2. Total-size mismatch — when the seed has a size_value/size_unit, the
-             candidate name should contain a matching number (within ±15 %
-             tolerance). If we can't find any matching unit at all, we trust the
-             rest of the scoring and return True.
+        Three checks:
+          1. Multi-pack indicators ("2x4,8 g", "Duopack", "Doppelpack", etc.) —
+             any of these means we've matched a multi-unit pack while the seed
+             is for a single unit.
+          2. Unit-category mismatch — if the seed is volume (ml/l), the scrape
+             must not be exclusively weight or piece. Symmetric for weight and
+             piece seeds. This catches "200 ml face cream → 100 g soap bar" and
+             "80 ct wipes → 250 ml baby shampoo".
+          3. Same-category size mismatch — within the same category, the scrape
+             number must be within ±15 % of the seed.
+
+        If the scrape carries NO numeric unit at all (e.g. a generic title), we
+        trust the rest of the scoring and return True.
         """
         if not scrape_name:
             return True
@@ -360,19 +454,17 @@ class DMSpider(Spider):
         if not (product.size_value and product.size_unit):
             return True
 
-        # Category mismatch: seed expects piece-count, scrape only carries
-        # weight/volume units (no piece marker anywhere). This catches the
-        # "babylove Feuchttücher (piece seed) -> babylove baby shampoo 250ml"
-        # class of wrong-product-line matches.
-        if product.size_unit.lower() == "piece":
-            has_piece = bool(re.search(
-                rf"(\d+[,.]?\d*)\s*{cls._UNIT_PATTERNS['piece']}\b",
-                scrape_name, re.IGNORECASE,
-            ))
-            if not has_piece and cls._VOLUME_OR_WEIGHT_RE.search(scrape_name):
-                return False
+        seed_cat = cls._seed_category(product.size_unit)
+        scrape_cats = cls._scrape_categories(scrape_name)
 
-        # Normalize seed to ml / g / piece.
+        # Unit-category mismatch (bidirectional): if the scrape carries unit
+        # categories AND none of them includes the seed's category, the
+        # candidate is the wrong kind of product.
+        if seed_cat in ("volume", "weight", "piece") and scrape_cats and seed_cat not in scrape_cats:
+            return False
+
+        # Same-category size tolerance: normalize seed to ml / g / piece and
+        # extract candidate numbers in the same canonical units.
         seed_v = float(product.size_value)
         seed_u = product.size_unit.lower()
         if seed_u == "l":
@@ -382,15 +474,48 @@ class DMSpider(Spider):
             seed_v *= 1000.0
             seed_u = "g"
 
-        unit_pat = cls._UNIT_PATTERNS.get(seed_u, re.escape(seed_u))
-        candidates = re.findall(
-            rf"(\d+[,.]?\d*)\s*{unit_pat}\b", scrape_name, re.IGNORECASE,
-        )
-        if not candidates:
+        if seed_u == "ml":
+            nums = cls._extract_volume_ml(scrape_name)
+        elif seed_u == "g":
+            nums = cls._extract_weight_g(scrape_name)
+        elif seed_u == "piece":
+            nums = cls._extract_piece_counts(scrape_name)
+        else:
+            nums = []
+
+        if not nums:
             return True
-        nums = [float(c.replace(",", ".")) for c in candidates]
         best_diff = min(abs(n - seed_v) / max(seed_v, 1e-6) for n in nums)
         return best_diff <= 0.15
+
+    @staticmethod
+    def _extract_volume_ml(name: str) -> list[float]:
+        out: list[float] = []
+        for n, unit in re.findall(
+            r"(?<![\d.,])(\d+[,.]?\d*)\s*(ml|l(?:iter)?)\b", name, re.IGNORECASE,
+        ):
+            v = float(n.replace(",", "."))
+            out.append(v * 1000.0 if unit.lower().startswith("l") else v)
+        return out
+
+    @staticmethod
+    def _extract_weight_g(name: str) -> list[float]:
+        out: list[float] = []
+        for n, unit in re.findall(
+            r"(?<![\d.,])(\d+[,.]?\d*)\s*(g(?:ramm)?|kg)\b", name, re.IGNORECASE,
+        ):
+            v = float(n.replace(",", "."))
+            out.append(v * 1000.0 if unit.lower() == "kg" else v)
+        return out
+
+    @staticmethod
+    def _extract_piece_counts(name: str) -> list[float]:
+        out: list[float] = []
+        pat = (r"(?<![\d.,])(\d+[,.]?\d*)\s*"
+               r"(?:st(?:ü|u)ck|stk\.?|st\.?(?!\w)|ks|kos|kom|szt|buc|db|бр\.?|pieces?|pcs?|tabs?)\b")
+        for n in re.findall(pat, name, re.IGNORECASE):
+            out.append(float(n.replace(",", ".")))
+        return out
 
     @staticmethod
     def _match_score(scrape_name: str, product: ProductSpec) -> float:

@@ -8,17 +8,20 @@ EUPRICE collects real shelf prices for identical SKUs (verified by EAN-13 barcod
 
 ## Status
 
-- **19 products tracked**, all with verified EAN-13 codes, all with real product images, all with canonical retailer URLs
-- **148 real cross-EU price observations** captured via Playwright scrapes of DM's 10 country sites — zero sample data, every row links to the actual retailer product page
-- Per-country coverage (real product pages scraped, of 19):
-  AT 18 · HU 18 · DE 17 · HR 17 · SI 17 · SK 15 · BG 14 · CZ 13 · RO 11 · PL 8
+- **18 drugstore products tracked**, all with verified EAN-13 codes, all with real product images, all with canonical retailer URLs
+- **87 real cross-EU price observations** captured via Playwright scrapes of DM's 10 country sites — zero sample data, every row links to the actual retailer product page and stores the JSON-LD EAN that page exposed at scrape time
+- Per-country coverage (real product pages scraped, of 18):
+  DE 25 · AT 16 · HR 8 · RO 8 · SI 8 · HU 7 · SK 7 · BG 6 · CZ 6 · PL 4
+- 9 products have ≥5 country observations (strong cross-country signal); 9 products are DE+AT only (anchor pair, included for completeness)
 - Country median wages and VAT rates seeded for all 10 countries
 - Italian retailer (Tigotà) scaffolded for IT↔SK comparison
 - Both rendering backends wired: Playwright (default, free) and Jina Reader (paid alt)
 
-**EAN is the prerequisite**: products without a verified EAN-13 don't enter the database. The scraper pipeline runs an EAN-capture step on DM Germany before cross-country scraping; products that fail to acquire an EAN are dropped. Cross-country matching is then EAN-keyed, immune to local-language naming variants ("Mizellenwasser" → "Micelárna voda" → "Micelarni voda" — same EAN, same DM internal SKU, real product page in each country).
+**Strict EAN-or-retailer-SKU matching**: every inserted price row satisfies one of two identity criteria — either (a) the scraped page's JSON-LD `gtin13` equals the seed EAN, OR (b) the scraped URL contains the same DM internal SKU id as the anchor country's URL (DM uses the same `/p/d/<NNNN>/` id across all its country domains for the same physical product, even when local EANs differ). If neither holds, no row is inserted for that country. Missing cells are honest; wrong cells are not.
 
-**Pack-guard rejects wrong-variant SKUs**: the spider refuses any candidate whose name contains multi-pack markers (`2x...`, `12x80`, `Duopack`, `Jumbopack`, `Big Pack`, `Reisegröße`, etc.) or whose parsed total size differs from the seed by more than ±15 %. After a full audit and re-scrape, the dataset has zero residual pack-size or wrong-variant contamination. See [`scripts/audit_pack_quality.py`](scripts/audit_pack_quality.py) — re-run it anytime to verify.
+**Pack-guard rejects wrong-variant SKUs**: even after identity is confirmed, the spider refuses any candidate whose name contains multi-pack markers (`2x...`, `12x80`, `Duopack`, `Jumbopack`, `Big Pack`, `Reisegröße`, etc.), whose unit category disagrees with the seed (volume ↔ weight ↔ piece — catches "200 ml face cream" matched to "100 g soap bar"), or whose parsed total size differs from the seed by more than ±15 %. After a full audit and re-scrape, the dataset has zero residual pack-size, category, or wrong-variant contamination. See [`scripts/audit_pack_quality.py`](scripts/audit_pack_quality.py) — re-run it anytime to verify.
+
+**Audit trail per row**: every `price` row stores the actual `scraped_ean` from the JSON-LD on the matched page (migration 003). The audit script independently re-verifies identity claims by comparing scraped vs canonical EAN per row — so any future regression in the matcher becomes detectable on the next audit run.
 
 The web app at `http://localhost:3000` renders a product grid, an interactive EU choropleth, a spread leaderboard, and per-product breakdowns with the minutes-of-work chart.
 

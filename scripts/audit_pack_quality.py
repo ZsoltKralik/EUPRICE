@@ -46,8 +46,40 @@ UNIT_PATS = {
     "l":  r"l(?:iter)?",
     "g":  r"g(?:ramm)?",
     "kg": r"kg",
-    "piece": r"(?:st(?:ü|u)ck|stk\.?|st\.?(?!\w)|ks|kos|szt|buc|pcs?|tabs?)",
+    "piece": r"(?:st(?:ü|u)ck|stk\.?|st\.?(?!\w)|ks|kos|kom|szt|buc|db|бр\.?|pieces?|pcs?|tabs?)",
 }
+
+# Bidirectional category detection — same patterns used by the spider's
+# pack-guard so audit and ingest agree on what counts as a category mismatch.
+VOLUME_RE = re.compile(r"(?<![\d.,])\d+[,.]?\d*\s*(?:ml|l(?:iter)?)\b", re.IGNORECASE)
+WEIGHT_RE = re.compile(r"(?<![\d.,])\d+[,.]?\d*\s*(?:g(?:ramm)?|kg)\b", re.IGNORECASE)
+PIECE_RE = re.compile(
+    r"(?<![\d.,])\d+[,.]?\d*\s*"
+    r"(?:st(?:ü|u)ck|stk\.?|st\.?(?!\w)|ks|kos|kom|szt|buc|db|бр\.?|pieces?|pcs?|tabs?)\b",
+    re.IGNORECASE,
+)
+
+
+def seed_category(unit: str) -> str:
+    u = (unit or "").lower()
+    if u in ("ml", "l"):
+        return "volume"
+    if u in ("g", "kg"):
+        return "weight"
+    if u == "piece":
+        return "piece"
+    return "other"
+
+
+def scrape_categories(name: str) -> set[str]:
+    cats: set[str] = set()
+    if VOLUME_RE.search(name):
+        cats.add("volume")
+    if WEIGHT_RE.search(name):
+        cats.add("weight")
+    if PIECE_RE.search(name):
+        cats.add("piece")
+    return cats
 
 
 def parse_total_size(name: str, unit: str) -> list[float]:
@@ -74,12 +106,23 @@ def audit() -> int:
 
     rows = list(conn.execute("""
         SELECT v.product_id, v.country_code, v.product_name, v.product_name_local,
-               v.ean, v.size_value, v.size_unit, p.canonical_url, v.url,
+               v.ean, v.scraped_ean, v.size_value, v.size_unit,
+               p.canonical_url, v.url,
                pd.name AS producer
         FROM v_latest_prices v
         JOIN product p   ON p.id = v.product_id
         JOIN producer pd ON pd.id = p.producer_id
     """))
+
+    # DM internal-SKU id matcher — same `/p/d/<NNNN>/` across country domains
+    # is strong evidence that DM treats the page as the same physical product
+    # even when the JSON-LD gtin13 happens to differ between countries.
+    DM_SKU_RE = re.compile(r"/p/d/(\d+)/", re.IGNORECASE)
+    def dm_sku(url):
+        if not url:
+            return None
+        m = DM_SKU_RE.search(url)
+        return m.group(1) if m else None
 
     suspects: list[dict] = []
     by_class: dict[str, int] = {}
@@ -89,14 +132,45 @@ def audit() -> int:
         producer = r["producer"]
         flags: list[tuple[str, str]] = []
 
+        # EAN_DIFF — the scraped page's JSON-LD gtin13 differs from the seed
+        # canonical EAN AND the DM internal SKU also differs. We allow a
+        # scraped EAN difference when the DM `/p/d/<sku>/` id matches the
+        # anchor page's SKU; that's the retailer's own "same product" claim.
+        canon = (r["ean"] or "").strip()
+        scraped = (r["scraped_ean"] or "").strip()
+        seed_sku = dm_sku(r["canonical_url"])
+        row_sku = dm_sku(r["url"])
+        sku_matches = bool(seed_sku and row_sku and seed_sku == row_sku)
+        if canon and scraped and canon != scraped and not sku_matches:
+            flags.append((
+                "EAN_DIFF",
+                f"scraped EAN {scraped} != canonical {canon} (DM SKU also differs: "
+                f"{row_sku} vs {seed_sku})",
+            ))
+        elif canon and not scraped:
+            # Pre-migration row inserted before scraped_ean was stored.
+            # Surface but don't gate CI on it — these can be re-scraped to fill in.
+            flags.append(("EAN_MISSING", "scraped EAN unknown (pre-migration row)"))
+
         # MULTI / REFILL — string-pattern based
         if MULTI_PACK_NUM_RE.search(name) or MULTI_PACK_WORD_RE.search(name):
             flags.append(("MULTI", "multi-pack marker in scraped name"))
         if REFILL_RE.search(name):
             flags.append(("REFILL", "refill / travel / mini marker"))
 
-        # SIZE — parsed total deviates from seed by > 15 %
+        # SIZE / CATEGORY — same-category divergence > 15 %, OR a unit-category
+        # mismatch (seed in ml, scrape only in g; or seed in piece, scrape only
+        # in ml; etc.). The category check is the cousin of MULTI: it catches
+        # whole-product-line mismatches (cream → soap, wipes → shampoo).
         if r["size_value"] and r["size_unit"]:
+            seed_cat = seed_category(r["size_unit"])
+            scrape_cats = scrape_categories(name)
+            if seed_cat in ("volume", "weight", "piece") and scrape_cats and seed_cat not in scrape_cats:
+                flags.append((
+                    "CATEGORY",
+                    f"seed is {seed_cat} ({r['size_value']:g}{r['size_unit']}) "
+                    f"but scrape units are {sorted(scrape_cats)}",
+                ))
             seed_v, seed_u = seed_size_canonical(r["size_value"], r["size_unit"])
             parsed = parse_total_size(name, seed_u)
             if parsed:

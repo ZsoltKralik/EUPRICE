@@ -1,20 +1,19 @@
 producer,name,name_en,size_value,size_unit,category,subcategory,search_hint,ean,canonical_url,notes
 Balea,Mizellenwasser 3in1 Rose,Micellar Water 3-in-1 Rose,400,ml,drugstore,micellar_water,balea mizellenwasser rose,,,DM private label - DM Germany rebranded as 'Gesichtswasser Rose'; same EAN/SKU across all DM countries
 Balea,Deo Roll-On sensitive,Deodorant Roll-on Sensitive,50,ml,drugstore,deodorant,balea deo roll-on sensitive,,,DM private label
-Denkmit,Geschirrspül-Tabs All in One,Dishwasher Tabs All-in-One,40,piece,household,dishwasher_tabs,denkmit geschirr tabs all in one,,,DM private label
-Denkmit,Allzweckreiniger Zitrone,Multi-Surface Cleaner Lemon,1,l,household,cleaner,denkmit allzweckreiniger zitrone,,,DM private label
-Denkmit,WC-Reiniger Gel,Toilet Cleaner Gel,750,ml,household,toilet_cleaner,denkmit wc reiniger gel,,,DM private label
 alverde,Feuchtigkeitsshampoo,Moisturizing Shampoo,200,ml,drugstore,shampoo,alverde feuchtigkeitsshampoo,,,DM organic line
 alverde,Handcreme Mandelblüte,Hand Cream Almond Blossom,75,ml,drugstore,hand_cream,alverde handcreme mandelblüte,,,DM organic line
 alverde,Naturkosmetik Lippenpflege Rose,Lip Balm Rose,4.8,g,drugstore,lip_balm,alverde lippenpflege rose,,,DM organic line
-babylove,Feuchttücher Sensitive,Baby Wet Wipes Sensitive,80,piece,baby,wet_wipes,babylove feuchttücher sensitive,,,DM baby line
-Mivolis,Vitamin D3,Vitamin D3 1000 IE,100,piece,supplements,vitamin_d,mivolis vitamin d3,,,DM supplements line
 Nivea,Creme,Original Creme Blue Tin,150,ml,drugstore,face_cream,nivea creme 150,,,Iconic SKU - identical EAN across EU
 Nivea,Soft Creme,Soft Moisturizing Cream,200,ml,drugstore,face_cream,nivea soft creme 200,,,
 Nivea,Deo Roll-On Black & White Invisible Original,Deodorant Roll-on Black & White Invisible,50,ml,drugstore,deodorant,nivea black white invisible roll on,,,
 Labello,Original Lippenpflege,Original Lip Balm,4.8,g,drugstore,lip_balm,labello original,,,Iconic SKU
 Labello,Cherry Shine,Cherry Shine Lip Balm,4.8,g,drugstore,lip_balm,labello cherry shine,,,
 Dove,Beauty Cream Bar,Beauty Cream Bar Soap,100,g,drugstore,soap,dove beauty cream bar 100,,,International brand
-Hansaplast,Classic Pflaster,Classic Plasters,20,piece,drugstore,plasters,hansaplast classic pflaster,,,Beiersdorf wound care
-Pantene,Pro-V Repair & Care Shampoo,Pro-V Repair & Care Shampoo,300,ml,drugstore,shampoo,pantene pro-v repair care,,,P&G international hair care
-Gillette,Fusion5 Klingen,Fusion5 Razor Blades,4,piece,drugstore,razor_blades,gillette fusion5 klingen,,,P&G shaving - high-margin SKU often cited in TSC literature
+Axe,Dark Temptation Bodyspray,Dark Temptation Body Spray,150,ml,drugstore,deodorant,axe dark temptation,,,Unilever - male grooming line
+Head & Shoulders,Classic Clean Shampoo,Classic Clean Anti-Dandruff Shampoo,250,ml,drugstore,shampoo,head shoulders classic clean,,,P&G anti-dandruff - pan-EU identical formulation
+Syoss,Repair Shampoo,Repair Therapy Shampoo,440,ml,drugstore,shampoo,syoss repair,,,Henkel - damaged hair line
+Nivea,Creme Soft Soap,Creme Soft Bar Soap,100,g,drugstore,soap,nivea creme soft seife,,,Beiersdorf - 100g bar version
+Pampers,Baby-Dry Gr 4,Baby-Dry Size 4 Diapers,25,piece,baby,diapers,pampers baby dry groesse 4,,,P&G - midi-maxi diapers 9-14kg
+HiPP,Bio Apfel Banane,Organic Apple-Banana Baby Food,190,g,baby,baby_food,hipp bio apfel banane,,,HiPP - organic fruit jar single
+Colgate,Total Original,Total Original Toothpaste,75,ml,drugstore,toothpaste,colgate total original,,,Colgate-Palmolive - flagship toothpaste

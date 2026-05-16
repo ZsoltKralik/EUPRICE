@@ -60,23 +60,72 @@ BGN is pegged to EUR at the convergence rate of 1.95583; this is hard-coded as a
 
 Standard and reduced (food) VAT rates per country are seeded in `db/migrations/001_seed_countries_and_shops.sql` from each country's tax-authority publications, current as of 2026 Q1. Drugstore items use the standard rate; food items use the reduced rate. VAT rates change; review periodically.
 
-## 4. Product identity — EAN-first
+## 4. Product identity — strict EAN-or-retailer-SKU
 
 [EAN-13 barcodes](https://www.gs1.org/standards/barcodes/ean-upc) are the canonical product identity. They are:
 - **Globally unique** (assigned by [GS1](https://www.gs1.org) manufacturer registries)
 - **Language-independent** (a barcode means the same thing in Helsinki and Athens)
 - **Stable** (the same physical SKU keeps its EAN through pack-design refreshes)
 
-Two prices are considered comparable only when they share an EAN. Without that constraint, "the same product" is ambiguous (different sizes, variants, formulations, multi-packs).
+Two prices are considered comparable only when one of two strict identity criteria is met. Without that constraint, "the same product" is ambiguous (different sizes, variants, formulations, multi-packs, sometimes outright different products).
 
-### 4.1 Bootstrap
+### 4.1 The two acceptance criteria
+
+For every cross-country scrape, the spider applies these criteria in order, from strongest to weakest. **A row is inserted only if one of them is satisfied** — there is no silent "fuzzy" fallback.
+
+**(a) EAN-13 equality (strongest).** The candidate page's JSON-LD `gtin13` value equals the canonical EAN captured from the anchor country. This is the gold standard of product identity. Pack-guard (see §4.4) still applies as a safety net against multi-pack variants that occasionally share an EAN with the single-unit SKU.
+
+**(b) Retailer-internal SKU equality (strong, retailer-specific).** Some retailers, including DM, use the same numeric SKU id in their URL pattern (`/p/d/<NNNN>/`) across all their country domains, even when the displayed JSON-LD EAN happens to differ between countries (retailer-assigned regional EANs for the same physical product). When the candidate URL carries the same SKU id as the anchor country's product URL, that is the retailer's own "same product" claim and is accepted. Pack-guard still applies.
+
+If neither criterion is met, the country has no observation for this product. This deliberate gap is preferable to inserting a row with weaker identity guarantees: a missing cell is honest; a wrong row is misleading.
+
+### 4.2 Pre-strict-matcher problems this prevents
+
+The strict matcher replaced an earlier text-scoring approach that produced silent product-mixing across countries. Concrete examples surfaced and fixed during the audit:
+
+- **Nivea Soft Creme 200 ml jar** was matched in CZ and HU to a 100 g Nivea Creme Soft *soap bar* — different product line, different EAN, but related name.
+- **Denkmit liquid floor cleaner** was matched in AT/DE to "WC Duftstein" *toilet stones* (different category entirely).
+- **alverde lip balm 4.8 g** was matched in HU/PL/SI to nail polish and cream blusher (because they shared the "rose" colour).
+- **Gillette Fusion5 4-pack blades** was matched in HR/HU to a single whole razor (different SKU, "1 db" / "1 kom").
+
+Every row in the current dataset has been re-validated under the strict criteria.
+
+### 4.3 Bootstrap
 
 For each tracked product:
-1. The "anchor" country (DM Germany) is scraped first using a name-based search hint.
-2. The product detail page's JSON-LD block exposes `gtin13`. This becomes the canonical EAN.
-3. Every other country is then searched by EAN directly — far more reliable than text search, and immune to cross-language naming differences ("Elseve" in IT, "Elvital" in DE, "Elseve" in NL — same EAN).
+1. The "anchor" country (DM Germany) is scraped first using a name-based search hint (Phase 2 of the spider — text-scored matching with pack-guard).
+2. The product detail page's JSON-LD block exposes `gtin13` and the spider records both the EAN and the canonical URL (which contains the DM internal SKU id).
+3. Every other country is then searched by EAN directly — far more reliable than text search, and immune to cross-language naming differences. The DM-SKU fallback catches the remaining cases where the local DM site indexes a different EAN for the same SKU.
 
-**EAN as prerequisite.** Products that fail to acquire an EAN at the anchor step are excluded from the database entirely. Without an EAN we cannot guarantee cross-country comparability — different local SKU names might land us on subtly different products. The pipeline enforces this by deleting any post-capture row where `ean IS NULL` before the cross-country scrape begins. This means published statistics can never accidentally compare apples to oranges due to a name-only match.
+**EAN as prerequisite.** Products that fail to acquire an EAN at the anchor step are excluded from the database entirely. The pipeline enforces this by deleting any post-capture row where `ean IS NULL` before the cross-country scrape begins.
+
+### 4.4 Pack-guard (size and category integrity)
+
+Even when EAN or SKU equality is satisfied, the candidate's local product name is checked against the seed's `size_value` and `size_unit`:
+
+| Check | Rejects |
+|---|---|
+| **Multi-pack markers** | `2x4,8 g`, `12x80 St`, `Duopack`, `Doppelpack`, `Tripack`, `Jumbopack`, `Reisegröße`, `Travel size`, `Mini-pack`, etc. — including multi-digit prefixes (`12x80`, `30x19,25`) |
+| **Unit-category mismatch** | Seed is volume (ml/l) but scrape units are only weight (g/kg) or piece-count, and vice versa. Catches the 200 ml cream → 100 g soap bar class of error. |
+| **Same-category size deviation > 15 %** | A 40-pack seed cannot match a 30-pack scrape; a 200 ml seed cannot match a 175 ml scrape. |
+
+This guard runs on every candidate, regardless of which acceptance criterion fired.
+
+### 4.5 Audit trail per row
+
+Every `price` row stores the actual EAN that the JSON-LD on the scraped page exposed, in a `scraped_ean` column added by migration 003. This persists the matcher's evidence so the audit (`scripts/audit_pack_quality.py`) can independently re-verify that every row's identity claim still holds, weeks or months after the row was inserted.
+
+The audit classifies suspect rows into:
+
+| Class | Meaning |
+|---|---|
+| **EAN_DIFF** | Scraped EAN differs from canonical EAN AND the DM-SKU also differs. Hard fail. |
+| **CATEGORY** | Seed unit category and scrape unit category disagree (volume↔weight↔piece). Hard fail. |
+| **MULTI** | Multi-pack indicator in the scraped name. Hard fail. |
+| **SIZE** | Same-category size deviates > 15 %. Hard fail. |
+| **TOKEN_MISS** | Seed name tokens missing from scrape. Soft warning — typically a cross-language naming difference (Mizellenwasser → Micelárna voda). Informational, not a quality failure. |
+
+A clean dataset has zero EAN_DIFF / CATEGORY / MULTI / SIZE flags.
 
 ### 4.2 Local naming
 
@@ -164,5 +213,7 @@ Sample citation:
 ## 11. Open issues
 
 - The `eurostat_pli` table is populated but not yet rendered in the web UI (planned).
-- Per-shop confidence scoring (`match_method` enum) would help filter EAN-verified vs name-matched rows in published statistics; not yet implemented.
-- Adding Tigotà (Italy) to enable the IT↔SK comparison that motivates the project.
+- Per-row `match_method` enum (`ean | sku | name | manual`) would let published statistics filter by acceptance criterion. Currently inferrable by comparing `price.scraped_ean` vs `product.ean` and DM SKU equality, but not a stored field.
+- Adding Tigotà (Italy) to enable the IT↔SK comparison that motivates the project. Scaffold exists; spider implementation pending.
+- Adding Müller (DE, AT, CH, HU, SI, HR, CZ, IT) as a second pan-EU drugstore for cross-retailer validation.
+- 9 of 18 tracked products currently only have AT+DE observations (anchor pair). Either expand DM coverage to non-DACH or accept the limitation as a property of which SKUs DM stocks where.

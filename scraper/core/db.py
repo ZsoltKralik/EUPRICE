@@ -34,13 +34,27 @@ def transaction(conn: sqlite3.Connection) -> Iterator[sqlite3.Connection]:
 
 
 def init_db(db_path: Path = DB_PATH) -> None:
-    """Apply schema + all migrations. Idempotent."""
+    """Apply schema + all migrations. Idempotent via PRAGMA user_version.
+
+    Migrations are named `NNN_description.sql`; once applied, `user_version`
+    is bumped to NNN and subsequent runs skip them. This lets migrations
+    contain non-idempotent DDL like ALTER TABLE without breaking re-runs.
+    """
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = connect(db_path)
     with transaction(conn):
         conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
-        for mig in sorted(MIGRATIONS_DIR.glob("*.sql")):
+    current = conn.execute("PRAGMA user_version").fetchone()[0]
+    for mig in sorted(MIGRATIONS_DIR.glob("*.sql")):
+        try:
+            version = int(mig.name.split("_", 1)[0])
+        except ValueError:
+            continue
+        if version <= current:
+            continue
+        with transaction(conn):
             conn.executescript(mig.read_text(encoding="utf-8"))
+            conn.execute(f"PRAGMA user_version = {version}")
     conn.close()
 
 
@@ -245,8 +259,8 @@ def insert_price(
             (product_id, shop_id, country_code, parsed_at, url,
              product_name_local, price_local, currency_code, price_eur, fx_rate,
              is_promo, regular_price_local, regular_price_eur,
-             raw_html_sha256, raw_html_path)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             raw_html_sha256, raw_html_path, scraped_ean)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             product_id,
@@ -264,6 +278,7 @@ def insert_price(
             regular_price_eur,
             scrape.raw_html_sha256,
             scrape.raw_html_path,
+            scrape.ean,
         ),
     )
     return cur.lastrowid

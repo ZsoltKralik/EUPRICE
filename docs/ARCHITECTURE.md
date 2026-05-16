@@ -96,7 +96,8 @@ product (id PK, ean UNIQUE, producer_id, name, size_value, size_unit,
 price (id PK, product_id, shop_id, country_code, parsed_at, url,
        product_name_local, price_local, currency_code, price_eur, fx_rate,
        is_promo, regular_price_local, regular_price_eur,
-       raw_html_sha256, raw_html_path)
+       raw_html_sha256, raw_html_path,
+       scraped_ean, is_sample)
 
 eurostat_pli (country_code PK, year PK, category_code PK, category_label, value)
 
@@ -124,6 +125,17 @@ v_latest_prices (view) — latest price per (product, shop, country)
 | `canonical_url` | scraper (the URL it landed on) | Anchor-country product page; the web app uses this for "View at retailer" links |
 
 The `price` table is append-only: every scrape adds rows. History accumulates automatically. The `v_latest_prices` view returns the most recent row per (product, shop, country).
+
+### Strict matcher in the DM spider
+
+The DM spider applies a strict two-tier acceptance rule, in order from strongest to weakest:
+
+1. **EAN equality.** Candidate page's JSON-LD `gtin13` equals seed `product.ean`. Pack-guard still runs as a safety net.
+2. **Retailer-SKU equality.** Candidate URL contains the same `/p/d/<NNNN>/` id as `product.canonical_url`. Pack-guard still runs.
+
+If neither fires, the spider returns `None` and the country gets no observation. There is no silent text-match fallback. This is the contract that makes cross-country claims defensible.
+
+The captured `scraped_ean` is persisted on the `price` row so the audit script (`scripts/audit_pack_quality.py`) can independently re-verify identity claims at any time. See [METHODOLOGY § 4](METHODOLOGY.md#4-product-identity--strict-ean-or-retailer-sku) for the rationale.
 
 ## Scraper
 
@@ -230,9 +242,11 @@ DELETE FROM price WHERE url LIKE 'sample://%';
 
 1. Append a row to `data/products.csv`.
 2. `python -m scraper.refresh init-db` — sync into the `product` table.
-3. `python -m scraper.refresh run --shop dm --countries DE` — capture EAN via DM Germany.
-4. `python -m scraper.refresh run --shop dm` — scrape across all countries by EAN.
-5. `python scripts/export_for_web.py` — refresh the web JSON.
+3. `python scripts/capture_missing_eans.py` — bootstrap EAN + image + canonical_url from DM Germany. Products that fail to match here are dropped (no EAN = no entry).
+4. `python -m scraper.refresh run --shop dm` — scrape across all countries under the strict EAN-or-SKU matcher.
+5. `python scripts/audit_pack_quality.py` — confirm 0 CATEGORY / MULTI / SIZE / EAN_DIFF flags.
+6. `python scripts/localize_images.py` — pull any new remote image URLs to `web/public/images/`.
+7. `python scripts/export_for_web.py` — refresh the web JSON.
 
 ### A new shop
 
@@ -255,10 +269,25 @@ VALUES ((SELECT id FROM shop WHERE code='dm'), 'XY', 'https://...', 1);
 
 Make sure the country row already exists in `country` (with VAT and currency).
 
+## Migrations
+
+Migrations live under `db/migrations/NNN_description.sql` and run after `db/schema.sql` in `init_db()`. SQLite's `PRAGMA user_version` is used as the cursor — each filename's `NNN` prefix becomes the version number, and migrations with version > current are applied in order. This makes non-idempotent DDL (e.g. `ALTER TABLE ADD COLUMN`) safe across repeated `init-db` runs.
+
+Current migrations:
+
+| # | File | Purpose |
+|---|---|---|
+| 001 | `001_seed_countries_and_shops.sql` | Initial country/VAT/wage/shop_country seeds |
+| 002 | `002_seed_italy_tigota.sql` | Adds Tigotà and Italy row |
+| 003 | `003_price_scraped_ean.sql` | Adds `price.scraped_ean` + refreshes `v_latest_prices` view |
+
 ## Future work
 
 - Add Tigotà spider proper (Italy) — main missing piece for IT↔SK case study.
+- Add Müller spider (Italy + Switzerland coverage) — second pan-EU drugstore.
+- Add Rossmann spider (Poland depth) — third pan-EU drugstore.
 - Render Eurostat PLI on the map as a fourth metric (triangulation overlay).
-- Per-row `match_method` enum (`ean | sku | name | manual`) for confidence filtering in published statistics.
+- Affordability-basket view: sum minutes-of-work for a representative basket of N SKUs per country.
+- Per-row `match_method` enum (`ean | sku | name | manual`) for explicit per-row filtering in published statistics.
 - robots.txt automation — store an `allowed` flag per `shop_country`.
 - Per-snapshot read-through cache — re-use archived HTML for development scrapes instead of re-fetching.
