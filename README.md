@@ -1,18 +1,22 @@
 # EUPRICE
 
-> Cross-EU consumer price comparison, anchored on the *minutes-of-median-wage* metric.
+> Same product. Different price. Different worktime. — EU consumer price fairness, documented.
 
-EUPRICE collects real shelf prices for identical SKUs (verified by EAN-13 barcode) across EU countries and reports the consumer cost in three forms: nominal EUR, VAT-exclusive EUR, and minutes of work at the country's median hourly wage. The last metric is the project's case-study headline: it converts an abstract price spread into the labor reality consumers in low-wage countries actually face.
+## Mission
 
-**Why this exists.** During EU travel, the project's originator noticed that identical drugstore products can cost 40 %+ more in lower-income countries than in their higher-income neighbours. EUPRICE turns that anecdote into a defensible dataset suitable for case-study work on territorial supply constraints (TSCs) at the EU policy level.
+EUPRICE documents EU consumer price unfairness in the drugstore category. We track the **same physical SKU** — identical EAN-13 barcode, identical pack size, identical retailer group — across EU member states and report the consumer cost in three forms: nominal EUR, VAT-exclusive EUR, and **minutes of median-wage work**. The labor-time view is the project's headline because that is what consumers in lower-wage member states actually experience: not "a few cents more," but a substantially larger share of their working day spent on the same household basics.
+
+This is directly relevant to **European Commission policy on territorial supply constraints (TSCs)**: contractual or de-facto restrictions that allow manufacturers to price-discriminate across the single market. EUPRICE provides the kind of product-level, identity-verified evidence that case-study work and policy submissions need — and is built to be quotable: every finding has a stable URL, an Open Graph share card, an attached citation block, and a downloadable JSON record.
+
+**Why this exists.** During EU travel, the project's originator noticed that identical drugstore products can cost 40 %+ more in lower-income countries than in their higher-income neighbours, and *much* more once you measure the price in the worktime of the consumer who actually pays it. EUPRICE turns that anecdote into a defensible dataset.
 
 ## Status
 
-- **18 drugstore products tracked**, all with verified EAN-13 codes, all with real product images, all with canonical retailer URLs
-- **87 real cross-EU price observations** captured via Playwright scrapes of DM's 10 country sites — zero sample data, every row links to the actual retailer product page and stores the JSON-LD EAN that page exposed at scrape time
-- Per-country coverage (real product pages scraped, of 18):
-  DE 25 · AT 16 · HR 8 · RO 8 · SI 8 · HU 7 · SK 7 · BG 6 · CZ 6 · PL 4
-- 9 products have ≥5 country observations (strong cross-country signal); 9 products are DE+AT only (anchor pair, included for completeness)
+- **9 cross-EU drugstore products tracked**, every one with observations in ≥5 EU countries — products with only Germany + Austria data were dropped because "cross-DACH" is not the same as "cross-EU"
+- All 9 have verified EAN-13 codes, real product images, and canonical retailer URLs
+- **69 real cross-EU price observations** captured via Playwright scrapes of DM's 10 country sites — zero sample data, every row links to the actual retailer product page and stores the JSON-LD EAN that page exposed at scrape time
+- Per-country coverage (of 9 products):
+  DE 8 · HR 8 · RO 8 · SI 8 · AT 7 · HU 7 · SK 7 · BG 6 · CZ 6 · PL 4
 - Country median wages and VAT rates seeded for all 10 countries
 - Italian retailer (Tigotà) scaffolded for IT↔SK comparison
 - Both rendering backends wired: Playwright (default, free) and Jina Reader (paid alt)

@@ -8,6 +8,19 @@ If you cite an EUPRICE figure in published work, please follow the [citation gui
 
 ---
 
+## 0. Why this is a fair comparison
+
+The site is built to support a policy claim — *"EU consumers in lower-wage countries pay more, in real labor time, for identical drugstore SKUs"* — and that claim is only as strong as the identity guarantees underneath every row. This is the 60-second methodological case for trusting the numbers:
+
+1. **Same physical SKU.** Every price row's source page has been verified to expose the seed EAN-13 in its JSON-LD `gtin13`. The scraped EAN is preserved per row (`price.scraped_ean`) so the audit can re-verify identity at any time.
+2. **Same retailer group.** Currently DM Drogerie Markt only. No cross-retailer averaging that would mix supply-chain effects with retail-margin effects.
+3. **Same retailer-internal SKU id.** When EAN-13 codes diverge between countries (regionally re-labeled SKUs), we accept a row only when DM's own `/p/d/<NNNN>/` id matches between the anchor country's URL and the scraped country's URL.
+4. **Pack-guard validation.** Multi-pack markers, unit-category mismatches (200 ml seed vs 100 g scrape), and size deviations greater than ±15 % are rejected automatically. Catches the wrong-product-line failures common to text-search matchers.
+5. **Minimum coverage threshold.** Every product on the public site has observations in at least 5 EU countries. Two German-speaking neighbors aren't a cross-EU finding, so DACH-only products are excluded.
+6. **Append-only history with reproducible snapshots.** Every scraped HTML page is archived locally with a SHA-256 fingerprint on the row, so any specific finding can be re-verified against the exact bytes that were parsed.
+
+If any of these break — e.g. a future spider regression silently re-introduces wrong-product matches — `scripts/audit_pack_quality.py` will surface it on the next audit run.
+
 ## 1. Research question
 
 When the *same physical product* (verified by EAN-13 barcode) is sold in multiple EU countries by the same retailer or retail chain, how does its consumer-facing price vary across borders — both in nominal EUR and in equivalent labor time at the country's median hourly wage?

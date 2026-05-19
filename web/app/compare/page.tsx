@@ -1,61 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { displayName, listLatest, type LatestPriceRow } from "@/lib/db";
+import { listLatest, type LatestPriceRow } from "@/lib/db";
+import { buildFindings } from "@/lib/findings";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Compare · EUPRICE",
-  description: "Products ranked by their cross-EU price spread.",
+  title: "Where the wage-time gap is widest",
+  description:
+    "Drugstore products ranked by how much more labor time their price represents in lower-wage EU countries vs higher-wage ones.",
 };
-
-type Row = {
-  product_id: number;
-  producer: string;
-  name: string;
-  name_en: string | null;
-  countries: number;
-  min_eur: number;
-  max_eur: number;
-  min_country: string;
-  max_country: string;
-  spread_pct: number;
-  has_promo: boolean;
-  max_minutes: number | null;
-  min_minutes: number | null;
-};
-
-function buildLeaderboard(rows: LatestPriceRow[]): Row[] {
-  const byProduct = new Map<number, LatestPriceRow[]>();
-  for (const r of rows) {
-    if (!byProduct.has(r.product_id)) byProduct.set(r.product_id, []);
-    byProduct.get(r.product_id)!.push(r);
-  }
-  const out: Row[] = [];
-  for (const [pid, group] of byProduct) {
-    if (group.length < 2) continue;
-    const minR = group.reduce((a, b) => (a.price_eur <= b.price_eur ? a : b));
-    const maxR = group.reduce((a, b) => (a.price_eur >= b.price_eur ? a : b));
-    const minutes = group.map((r) => r.minutes_of_work).filter((m): m is number => m !== null);
-    out.push({
-      product_id: pid,
-      producer: group[0].producer,
-      name: group[0].product_name,
-      name_en: group[0].product_name_en,
-      countries: group.length,
-      min_eur: minR.price_eur,
-      max_eur: maxR.price_eur,
-      min_country: minR.country_code,
-      max_country: maxR.country_code,
-      spread_pct: ((maxR.price_eur - minR.price_eur) / minR.price_eur) * 100,
-      has_promo: group.some((r) => r.is_promo),
-      max_minutes: minutes.length ? Math.max(...minutes) : null,
-      min_minutes: minutes.length ? Math.min(...minutes) : null,
-    });
-  }
-  out.sort((a, b) => b.spread_pct - a.spread_pct);
-  return out;
-}
 
 export default async function ComparePage() {
   let rows: LatestPriceRow[] = [];
@@ -70,16 +24,26 @@ export default async function ComparePage() {
     return <div className="text-amber-700">{dbError}</div>;
   }
 
-  const board = buildLeaderboard(rows);
-  const maxSpread = board[0]?.spread_pct ?? 0;
+  const board = buildFindings(rows);
+  const maxRatio = Math.max(...board.map((b) => b.minutes_ratio ?? 0), 1);
 
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Biggest spreads</h1>
-        <p className="mt-2 max-w-2xl text-slate-600">
-          Products ranked by how much more they cost in their most expensive EU country vs the cheapest.
-          The minutes-of-work column shows the gap in real cost — what a low-wage worker actually pays.
+        <div className="inline-flex items-center rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
+          Fairness leaderboard
+        </div>
+        <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+          Where the wage-time gap is widest
+        </h1>
+        <p className="mt-3 max-w-2xl text-slate-600">
+          Drugstore products ranked by labor-time ratio — how many <em>minutes of median-wage
+          work</em> the same physical SKU costs in its most-expensive EU country vs its
+          cheapest. The minutes column is the case-study number; EUR is for context. See the{" "}
+          <Link href="/about" className="font-medium text-indigo-700 hover:text-indigo-900">
+            methodology
+          </Link>{" "}
+          for why labor time is the fair comparison metric.
         </p>
       </div>
 
@@ -93,10 +57,10 @@ export default async function ComparePage() {
             <thead>
               <tr className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <th className="px-4 py-3">Product</th>
-                <th className="px-4 py-3 text-right">Cheapest</th>
-                <th className="px-4 py-3 text-right">Most expensive</th>
-                <th className="px-4 py-3">EUR spread</th>
-                <th className="px-4 py-3 text-right">Min of work spread</th>
+                <th className="px-4 py-3">Wage-time gap (the unfairness)</th>
+                <th className="px-4 py-3 text-right">Min worktime</th>
+                <th className="px-4 py-3 text-right">Max worktime</th>
+                <th className="px-4 py-3 text-right">EUR spread</th>
                 <th className="px-4 py-3 text-right">Countries</th>
               </tr>
             </thead>
@@ -111,42 +75,60 @@ export default async function ComparePage() {
                       href={`/product/${r.product_id}`}
                       className="font-medium text-slate-900 hover:text-indigo-700"
                     >
-                      <span className="text-xs uppercase tracking-wide text-slate-500">{r.producer}</span>{" "}
-                      — {displayName({ name: r.name, name_en: r.name_en })}
+                      <span className="text-xs uppercase tracking-wide text-slate-500">
+                        {r.producer}
+                      </span>{" "}
+                      — {r.display_name}
+                      <span className="ml-1 text-xs text-slate-500">
+                        ({r.size_value} {r.size_unit})
+                      </span>
                     </Link>
-                    {r.has_promo && (
+                    {r.any_promo && (
                       <span className="ml-2 rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-rose-700 ring-1 ring-rose-200">
                         promo
                       </span>
                     )}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono tabular-nums text-emerald-700">
-                    €{r.min_eur.toFixed(2)}{" "}
-                    <span className="text-slate-400">({r.min_country})</span>
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono tabular-nums text-rose-700">
-                    €{r.max_eur.toFixed(2)}{" "}
-                    <span className="text-slate-400">({r.max_country})</span>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="h-2 w-32 rounded-full bg-slate-100">
                         <div
                           className="h-full rounded-full bg-indigo-500"
-                          style={{ width: `${Math.min(100, (r.spread_pct / Math.max(maxSpread, 1)) * 100)}%` }}
+                          style={{
+                            width: `${Math.min(
+                              100,
+                              ((r.minutes_ratio ?? 1) / Math.max(maxRatio, 1)) * 100,
+                            )}%`,
+                          }}
                         />
                       </div>
-                      <span className="font-mono text-sm font-semibold tabular-nums text-slate-900">
-                        {r.spread_pct.toFixed(0)}%
+                      <span className="font-mono text-sm font-semibold tabular-nums text-indigo-700">
+                        {r.minutes_ratio !== null
+                          ? `${r.minutes_ratio.toFixed(1)}×`
+                          : "—"}
                       </span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-right font-mono tabular-nums text-indigo-700">
-                    {r.min_minutes !== null && r.max_minutes !== null
-                      ? `${r.min_minutes.toFixed(0)} → ${r.max_minutes.toFixed(0)} min`
+                  <td className="px-4 py-3 text-right font-mono tabular-nums text-emerald-700">
+                    {r.cheapest_minutes
+                      ? `${r.cheapest_minutes.minutes.toFixed(0)} min (${r.cheapest_minutes.country_code})`
                       : "—"}
                   </td>
-                  <td className="px-4 py-3 text-right text-slate-600">{r.countries}</td>
+                  <td className="px-4 py-3 text-right font-mono tabular-nums text-rose-700">
+                    {r.dearest_minutes
+                      ? `${r.dearest_minutes.minutes.toFixed(0)} min (${r.dearest_minutes.country_code})`
+                      : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="font-mono tabular-nums text-slate-700">
+                      €{r.cheapest_eur.price_eur.toFixed(2)}
+                      <span className="mx-1 text-slate-400">→</span>€{r.dearest_eur.price_eur.toFixed(2)}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      {r.eur_spread_pct.toFixed(0)}% spread
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-right text-slate-600">{r.countries_observed}</td>
                 </tr>
               ))}
             </tbody>

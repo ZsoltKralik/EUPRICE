@@ -1,33 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { displayName, listLatest, listProducts, type LatestPriceRow, type ProductLite } from "@/lib/db";
+import { listLatest, listProducts, type LatestPriceRow, type ProductLite } from "@/lib/db";
+import { buildFindings, headlineSentence, type Finding } from "@/lib/findings";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Products · EUPRICE",
+  title: "Same product. Different price. Different worktime.",
+  description:
+    "Identical drugstore SKUs cost more — in real labor time — for consumers in lower-wage EU member states. Verified product-by-product across 10 countries.",
 };
-
-function groupByProduct(rows: LatestPriceRow[]): Map<number, LatestPriceRow[]> {
-  const m = new Map<number, LatestPriceRow[]>();
-  for (const r of rows) {
-    if (!m.has(r.product_id)) m.set(r.product_id, []);
-    m.get(r.product_id)!.push(r);
-  }
-  return m;
-}
-
-function spreadPct(rows: LatestPriceRow[]): number | null {
-  const eur = rows.map((r) => r.price_eur).filter((p) => p > 0);
-  if (eur.length < 2) return null;
-  return ((Math.max(...eur) - Math.min(...eur)) / Math.min(...eur)) * 100;
-}
-
-function minutesSpread(rows: LatestPriceRow[]): { min: number; max: number } | null {
-  const m = rows.map((r) => r.minutes_of_work).filter((x): x is number => x !== null);
-  if (m.length < 2) return null;
-  return { min: Math.min(...m), max: Math.max(...m) };
-}
 
 export default async function Home() {
   let rows: LatestPriceRow[] = [];
@@ -45,165 +27,231 @@ export default async function Home() {
         <h2 className="mb-2 font-semibold">Data not ready</h2>
         <p className="mb-2 text-sm">{dbError}</p>
         <p className="text-sm">
-          Run <code className="rounded bg-amber-100 px-1.5 py-0.5 font-mono">python scripts/export_for_web.py</code> in
-          the repo root.
+          Run <code className="rounded bg-amber-100 px-1.5 py-0.5 font-mono">python scripts/export_for_web.py</code>{" "}
+          in the repo root.
         </p>
       </div>
     );
   }
 
-  const groups = groupByProduct(rows);
-  const noPriceYet = allProducts.filter((p) => !groups.has(p.id));
+  const findings = buildFindings(rows);
+  const headline = findings.find((f) => f.minutes_ratio !== null);
   const totalCountries = new Set(rows.map((r) => r.country_code)).size;
-  const totalSnapshots = rows.length;
 
   return (
     <div>
       {/* hero */}
-      <section className="mb-10">
+      <section className="mb-12">
         <div className="inline-flex items-center rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
-          EU consumer price research
+          EU consumer price fairness
         </div>
         <h1 className="mt-4 text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-          Same product, <span className="text-indigo-600">different price.</span>
+          Same product. <span className="text-indigo-600">Different price.</span>{" "}
+          <span className="block sm:inline">Different worktime.</span>
         </h1>
-        <p className="mt-4 max-w-2xl text-lg leading-relaxed text-slate-600">
-          Tracking everyday consumer items across {totalCountries} EU countries — measured in EUR,
-          ex-VAT, and the metric that really matters: <span className="font-semibold text-slate-900">minutes of median-wage work</span>.
+        <p className="mt-5 max-w-2xl text-lg leading-relaxed text-slate-600">
+          Identical drugstore SKUs cost more — in real labor time — for consumers in lower-wage EU
+          member states. Verified product-by-product across {totalCountries} countries at the same
+          retailer group.
         </p>
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <Link
-            href="/map"
+            href="/compare"
             className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-soft hover:bg-indigo-700"
           >
-            Open the map →
+            See the wage-time gap →
           </Link>
           <Link
-            href="/compare"
+            href="/map"
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 shadow-soft hover:bg-slate-50"
           >
-            Biggest spreads
+            Open the map
+          </Link>
+          <Link
+            href="/about"
+            className="inline-flex items-center gap-2 rounded-xl border border-transparent px-5 py-2.5 text-sm font-semibold text-slate-600 hover:text-slate-900"
+          >
+            Why this matters
           </Link>
         </div>
 
         {/* quick stats */}
         <div className="mt-8 grid grid-cols-3 gap-3 max-w-xl">
-          <Stat value={allProducts.length} label="products tracked" />
+          <Stat value={allProducts.length} label="cross-EU products" />
           <Stat value={totalCountries} label="countries" />
-          <Stat value={totalSnapshots} label="price snapshots" />
+          <Stat value={rows.length} label="verified observations" />
         </div>
       </section>
 
-      <h2 className="mb-4 text-xl font-semibold tracking-tight text-slate-900">Tracked products</h2>
+      {/* headline finding card */}
+      {headline && <HeadlineCard finding={headline} />}
 
-      {groups.size === 0 && noPriceYet.length === 0 ? (
+      <h2 className="mb-1 text-xl font-semibold tracking-tight text-slate-900">
+        Tracked products
+      </h2>
+      <p className="mb-5 text-sm text-slate-500">
+        Ordered by the labor-time gap: products at the top punish low-wage consumers the most.
+      </p>
+
+      {findings.length === 0 ? (
         <EmptyState />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[...groups.entries()].map(([productId, group]) => {
-            const sample = group[0];
-            const spread = spreadPct(group);
-            const mw = minutesSpread(group);
-            const promos = group.filter((r) => r.is_promo).length;
-            const cheapest = group.reduce((a, b) => (a.price_eur < b.price_eur ? a : b));
-            const dearest = group.reduce((a, b) => (a.price_eur > b.price_eur ? a : b));
-            return (
-              <Link
-                key={productId}
-                href={`/product/${productId}`}
-                className="group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-soft hover:shadow-lift"
-              >
-                <div className="flex items-center justify-center bg-slate-50 p-6 h-44 border-b border-slate-100">
-                  {sample.image_url ? (
-                    <img
-                      src={sample.image_url}
-                      alt=""
-                      className="h-full w-auto object-contain transition group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="text-xs uppercase tracking-wide text-slate-400">no image</div>
-                  )}
-                  {promos > 0 && (
-                    <span className="absolute right-3 top-3 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-700 ring-1 ring-rose-200">
-                      promo · {promos}
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-1 flex-col p-5">
-                  <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                    {sample.producer}
-                  </div>
-                  <div className="mt-1 line-clamp-2 text-base font-semibold leading-snug text-slate-900">
-                    {displayName(sample)}
-                  </div>
-                  <div className="mt-1 text-xs text-slate-500">
-                    {sample.size_value ?? "?"} {sample.size_unit ?? ""}
-                    {sample.ean && (
-                      <>
-                        {" · "}
-                        <span className="font-mono">{sample.ean}</span>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <div className="text-slate-500">Cheapest</div>
-                      <div className="font-mono text-sm font-semibold text-emerald-700 tabular-nums">
-                        €{cheapest.price_eur.toFixed(2)}{" "}
-                        <span className="text-slate-400">{cheapest.country_code}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-slate-500">Most</div>
-                      <div className="font-mono text-sm font-semibold text-rose-700 tabular-nums">
-                        €{dearest.price_eur.toFixed(2)}{" "}
-                        <span className="text-slate-400">{dearest.country_code}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-                    {spread !== null && (
-                      <span className="rounded-md bg-slate-100 px-2 py-0.5 font-mono font-semibold tabular-nums text-slate-700">
-                        {spread.toFixed(0)}% spread
-                      </span>
-                    )}
-                    {mw && (
-                      <span className="rounded-md bg-indigo-50 px-2 py-0.5 font-mono font-semibold tabular-nums text-indigo-700">
-                        {mw.min.toFixed(0)}–{mw.max.toFixed(0)} min/wage
-                      </span>
-                    )}
-                    <span className="text-slate-400">·</span>
-                    <span className="text-slate-500">
-                      {group.length} {group.length === 1 ? "country" : "countries"}
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      )}
-
-      {noPriceYet.length > 0 && (
-        <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-soft">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Tracked but no prices yet ({noPriceYet.length})
-          </h3>
-          <div className="mt-2 flex flex-wrap gap-2 text-xs">
-            {noPriceYet.map((p) => (
-              <span
-                key={p.id}
-                className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-slate-600"
-              >
-                {p.producer} {p.name}
-              </span>
-            ))}
-          </div>
+          {findings.map((f) => (
+            <ProductCard key={f.product_id} finding={f} />
+          ))}
         </div>
       )}
     </div>
+  );
+}
+
+function HeadlineCard({ finding }: { finding: Finding }) {
+  const c = finding.cheapest_minutes!;
+  const d = finding.dearest_minutes!;
+  const ratio = finding.minutes_ratio!;
+  return (
+    <Link
+      href={`/product/${finding.product_id}`}
+      className="group mb-12 block overflow-hidden rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-white p-6 shadow-soft hover:shadow-lift sm:p-8"
+    >
+      <div className="flex items-center gap-2">
+        <span className="inline-flex items-center rounded-full bg-indigo-600 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+          Headline finding
+        </span>
+        <span className="text-xs text-slate-500">
+          Click for full per-country breakdown →
+        </span>
+      </div>
+      <div className="mt-4 flex flex-col items-start gap-6 sm:flex-row sm:items-center">
+        {finding.image_url && (
+          <div className="flex h-32 w-32 shrink-0 items-center justify-center rounded-xl border border-indigo-100 bg-white p-3">
+            <img
+              src={finding.image_url}
+              alt=""
+              className="h-full w-auto object-contain"
+            />
+          </div>
+        )}
+        <div className="flex-1">
+          <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            {finding.producer}
+          </div>
+          <div className="mt-1 text-lg font-semibold leading-snug text-slate-900 sm:text-xl">
+            {finding.display_name}{" "}
+            <span className="font-normal text-slate-500">
+              ({finding.size_value} {finding.size_unit})
+            </span>
+          </div>
+          <p className="mt-4 text-base leading-relaxed text-slate-800 sm:text-lg">
+            Costs{" "}
+            <span className="font-bold text-rose-700">
+              {d.minutes.toFixed(0)} minutes of work in {d.country_code}
+            </span>{" "}
+            vs{" "}
+            <span className="font-bold text-emerald-700">
+              {c.minutes.toFixed(0)} minutes in {c.country_code}
+            </span>{" "}
+            —{" "}
+            <span className="font-bold text-indigo-700">
+              {ratio.toFixed(1)}× the labor time
+            </span>{" "}
+            for the same physical SKU.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-600">
+            <span className="font-mono">EAN {finding.ean ?? "—"}</span>
+            <span>·</span>
+            <span>
+              €{c.price_eur.toFixed(2)} → €{d.price_eur.toFixed(2)} ({finding.eur_spread_pct.toFixed(0)}% EUR spread)
+            </span>
+            <span>·</span>
+            <span>{finding.countries_observed} countries observed</span>
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function ProductCard({ finding }: { finding: Finding }) {
+  const c = finding.cheapest_minutes;
+  const d = finding.dearest_minutes;
+  return (
+    <Link
+      href={`/product/${finding.product_id}`}
+      className="group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-soft hover:shadow-lift"
+    >
+      <div className="flex items-center justify-center bg-slate-50 p-6 h-44 border-b border-slate-100">
+        {finding.image_url ? (
+          <img
+            src={finding.image_url}
+            alt=""
+            className="h-full w-auto object-contain transition group-hover:scale-105"
+          />
+        ) : (
+          <div className="text-xs uppercase tracking-wide text-slate-400">no image</div>
+        )}
+        {finding.any_promo && (
+          <span className="absolute right-3 top-3 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-700 ring-1 ring-rose-200">
+            promo
+          </span>
+        )}
+      </div>
+      <div className="flex flex-1 flex-col p-5">
+        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          {finding.producer}
+        </div>
+        <div className="mt-1 line-clamp-2 text-base font-semibold leading-snug text-slate-900">
+          {finding.display_name}
+        </div>
+        <div className="mt-1 text-xs text-slate-500">
+          {finding.size_value ?? "?"} {finding.size_unit ?? ""}
+          {finding.ean && (
+            <>
+              {" · "}
+              <span className="font-mono">{finding.ean}</span>
+            </>
+          )}
+        </div>
+
+        {/* MINUTES is the hero metric */}
+        {c && d ? (
+          <div className="mt-4 rounded-xl bg-indigo-50/60 p-3 ring-1 ring-indigo-100">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-700">
+              Wage-time gap
+            </div>
+            <div className="mt-1 flex items-baseline gap-1.5 font-mono tabular-nums">
+              <span className="text-base font-semibold text-emerald-700">
+                {c.minutes.toFixed(0)}
+              </span>
+              <span className="text-xs text-slate-400">min ({c.country_code})</span>
+              <span className="mx-1 text-slate-300">→</span>
+              <span className="text-base font-semibold text-rose-700">
+                {d.minutes.toFixed(0)}
+              </span>
+              <span className="text-xs text-slate-400">min ({d.country_code})</span>
+            </div>
+            {finding.minutes_ratio !== null && (
+              <div className="mt-1 text-xs font-semibold text-indigo-700">
+                {finding.minutes_ratio.toFixed(1)}× more worktime for the low-wage consumer
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="mt-4 text-xs text-slate-400">No wage data</div>
+        )}
+
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+          <span>
+            €{finding.cheapest_eur.price_eur.toFixed(2)} → €{finding.dearest_eur.price_eur.toFixed(2)}
+          </span>
+          <span>·</span>
+          <span>{finding.eur_spread_pct.toFixed(0)}% EUR spread</span>
+          <span>·</span>
+          <span>{finding.countries_observed} countries</span>
+        </div>
+      </div>
+    </Link>
   );
 }
 

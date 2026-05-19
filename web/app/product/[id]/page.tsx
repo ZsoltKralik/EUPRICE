@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { displayName, getProductLatest, priceHistory } from "@/lib/db";
+import { buildFindings, headlineSentence } from "@/lib/findings";
 import PriceBarChart from "@/components/PriceBarChart";
 import MinutesOfWorkChart from "@/components/MinutesOfWorkChart";
 import PriceHistoryChart from "@/components/PriceHistoryChart";
@@ -14,14 +15,31 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params;
   const productId = Number(id);
-  if (!Number.isInteger(productId)) return { title: "Product · EUPRICE" };
+  if (!Number.isInteger(productId)) return { title: "Product" };
   const rows = await getProductLatest(productId);
   const head = rows[0];
-  if (!head) return { title: "Product · EUPRICE" };
+  if (!head) return { title: "Product" };
   const name = displayName(head);
+  const findings = buildFindings(rows);
+  const finding = findings[0];
+  const headline = finding ? headlineSentence(finding) : null;
+  const title = `${head.producer} ${name}`;
+  const description = headline
+    ? `${head.producer} ${name} (${head.size_value ?? ""}${head.size_unit ?? ""}): ${headline}. Same physical SKU, same retailer, ${rows.length} EU countries — EAN ${head.ean ?? ""}.`
+    : `Cross-EU prices for ${head.producer} ${name} (${head.size_value ?? ""}${head.size_unit ?? ""}) across ${rows.length} countries.`;
   return {
-    title: `${head.producer} ${name} · EUPRICE`,
-    description: `Cross-EU prices for ${head.producer} ${name} (${head.size_value ?? ""}${head.size_unit ?? ""}) across ${rows.length} countries.`,
+    title,
+    description,
+    openGraph: {
+      title: `${title} — ${headline ?? "EU cross-country prices"}`,
+      description,
+      type: "article",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
   };
 }
 
@@ -59,6 +77,9 @@ export default async function ProductPage({
   const minRow = rows.reduce((a, b) => (a.price_eur <= b.price_eur ? a : b));
   const maxRow = rows.reduce((a, b) => (a.price_eur >= b.price_eur ? a : b));
   const spreadPct = ((maxRow.price_eur - minRow.price_eur) / minRow.price_eur) * 100;
+  const finding = buildFindings(rows)[0] ?? null;
+  const headline = finding ? headlineSentence(finding) : null;
+  const productDisplayName = displayName(sample);
 
   const barData = rows.map((r) => ({
     country: r.country_code,
@@ -128,6 +149,42 @@ export default async function ProductPage({
         </div>
       </header>
 
+      {/* headline finding — the unfairness statement, prominent */}
+      {finding && finding.cheapest_minutes && finding.dearest_minutes && finding.minutes_ratio && (
+        <section className="mb-10 overflow-hidden rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-white p-6 shadow-soft sm:p-8">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-700">
+            The wage-time gap
+          </div>
+          <p className="mt-2 text-xl leading-relaxed text-slate-800 sm:text-2xl">
+            This product costs{" "}
+            <span className="font-bold text-rose-700">
+              {finding.dearest_minutes.minutes.toFixed(0)} minutes of work in{" "}
+              {finding.dearest_minutes.country_code}
+            </span>{" "}
+            vs{" "}
+            <span className="font-bold text-emerald-700">
+              {finding.cheapest_minutes.minutes.toFixed(0)} minutes in{" "}
+              {finding.cheapest_minutes.country_code}
+            </span>{" "}
+            —{" "}
+            <span className="font-bold text-indigo-700">
+              {finding.minutes_ratio.toFixed(1)}× the labor time
+            </span>{" "}
+            for the same physical SKU.
+          </p>
+          <p className="mt-3 text-xs leading-relaxed text-slate-500">
+            Calculated as <code>price_eur ÷ median_hourly_wage × 60</code>. Wages from
+            Eurostat <code className="font-mono">earn_ses_hourly</code>. The cross-country
+            comparison is identity-verified — same EAN-13 barcode, same retailer-internal
+            SKU id, same pack size.{" "}
+            <Link href="/about" className="font-medium text-indigo-700 hover:text-indigo-900">
+              Methodology
+            </Link>
+            .
+          </p>
+        </section>
+      )}
+
       {/* stat cards */}
       <section className="mb-10 grid grid-cols-1 gap-4 md:grid-cols-3">
         <StatCard
@@ -143,7 +200,7 @@ export default async function ProductPage({
           sub={maxRow.country_name}
         />
         <StatCard
-          label="Spread"
+          label="EUR spread"
           accent="indigo"
           value={`${spreadPct.toFixed(0)}%`}
           sub={`${maxRow.country_code} vs ${minRow.country_code}`}
@@ -250,7 +307,101 @@ export default async function ProductPage({
           </tbody>
         </table>
       </section>
+
+      {/* Cite + Share */}
+      <CiteAndShare
+        productId={productId}
+        producer={sample.producer}
+        displayName={productDisplayName}
+        sizeValue={sample.size_value}
+        sizeUnit={sample.size_unit}
+        ean={sample.ean}
+        headline={headline}
+        scrapedAt={sample.parsed_at}
+      />
     </div>
+  );
+}
+
+function CiteAndShare({
+  productId,
+  producer,
+  displayName,
+  sizeValue,
+  sizeUnit,
+  ean,
+  headline,
+  scrapedAt,
+}: {
+  productId: number;
+  producer: string;
+  displayName: string;
+  sizeValue: number | null;
+  sizeUnit: string | null;
+  ean: string | null;
+  headline: string | null;
+  scrapedAt: string;
+}) {
+  const sizeStr = sizeValue && sizeUnit ? ` ${sizeValue} ${sizeUnit}` : "";
+  const productLabel = `${producer} ${displayName}${sizeStr}`;
+  const date = scrapedAt.split("T")[0];
+  const citation =
+    `${productLabel} (EAN ${ean ?? "—"}) — ${headline ?? "cross-EU price observations"}. ` +
+    `Source: EUPRICE, scraped ${date}. ` +
+    `Identity verified by EAN-13 + DM internal SKU id. ` +
+    `Wages from Eurostat earn_ses_hourly. ` +
+    `https://euprice.example.org/product/${productId}`;
+
+  const shareText = headline
+    ? `${productLabel}: ${headline}. Same physical SKU, same retailer, across the EU. Via EUPRICE.`
+    : `${productLabel}: see the EU cross-country price comparison on EUPRICE.`;
+  const shareUrl = `https://euprice.example.org/product/${productId}`;
+
+  const twitter = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
+  const linkedin = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`;
+  const mastodon = `https://mastodonshare.com/?text=${encodeURIComponent(shareText + " " + shareUrl)}`;
+
+  return (
+    <section className="mt-10 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-soft">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+          Cite this finding
+        </h2>
+        <p className="mt-2 text-xs text-slate-500">
+          For journalists, researchers, and EU policy work. Copy the block below and adapt
+          to your house style.
+        </p>
+        <pre className="mt-3 overflow-x-auto whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-700">
+          {citation}
+        </pre>
+      </div>
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-soft">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+          Share this finding
+        </h2>
+        <p className="mt-2 text-xs text-slate-500">
+          Help these numbers reach the audiences that can do something about them.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <ShareLink href={twitter} label="X / Twitter" />
+          <ShareLink href={linkedin} label="LinkedIn" />
+          <ShareLink href={mastodon} label="Mastodon" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ShareLink({ href, label }: { href: string; label: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+    >
+      {label} ↗
+    </a>
   );
 }
 
