@@ -12,11 +12,23 @@ This is directly relevant to **European Commission policy on territorial supply 
 
 ## Status
 
-- **9 cross-EU drugstore products tracked**, every one with observations in ≥5 EU countries — products with only Germany + Austria data were dropped because "cross-DACH" is not the same as "cross-EU"
-- All 9 have verified EAN-13 codes, real product images, and canonical retailer URLs
-- **69 real cross-EU price observations** captured via Playwright scrapes of DM's 10 country sites — zero sample data, every row links to the actual retailer product page and stores the JSON-LD EAN that page exposed at scrape time
-- Per-country coverage (of 9 products):
-  DE 8 · HR 8 · RO 8 · SI 8 · AT 7 · HU 7 · SK 7 · BG 6 · CZ 6 · PL 4
+- **12 cross-EU products tracked** across two categories — drugstore essentials (9) and baby essentials (3, all DM-private-label babylove SKUs: premium diapers, pants, fruit pouch). Every product has observations in ≥5 EU countries; DACH-only products excluded.
+- All 12 have verified EAN-13 codes, real product images, and canonical retailer URLs
+- **90 real cross-EU price observations** captured via Playwright scrapes of DM's 10 country sites — zero sample data, every row links to the actual retailer product page and stores the JSON-LD EAN that page exposed at scrape time
+- Per-country coverage (of 12 products):
+  DE 11 · SI 11 · HR 10 · AT 9 · HU 9 · RO 9 · SK 9 · BG 8 · CZ 8 · PL 6
+
+### Headline findings (current scrape)
+
+| Product | Cheapest worktime | Most worktime | Ratio |
+|---|---|---|---|
+| Balea Mizellenwasser 3-in-1 Rose (400 ml) | 4 min (DE) | 36 min (BG) | **9.0×** |
+| alverde Feuchtigkeitsshampoo (200 ml) | 4 min (DE) | 25 min (BG) | **6.9×** |
+| Balea Deo Roll-On Sensitive (50 ml) | 2 min (DE) | 10 min (RO) | **6.1×** |
+| Nivea Creme (150 ml) | 8 min (DE) | 40 min (BG) | **5.2×** |
+| **babylove Premium Windeln Gr 4 (40 pcs)** | 15 min (DE) | **76 min (BG)** | **5.0×** |
+
+The diaper case is the most consequential — diapers are recurring essential purchases, so a 5× wage-time gap compounds into a real, ongoing burden on parents in lower-income EU member states.
 - Country median wages and VAT rates seeded for all 10 countries
 - Italian retailer (Tigotà) scaffolded for IT↔SK comparison
 - Both rendering backends wired: Playwright (default, free) and Jina Reader (paid alt)
