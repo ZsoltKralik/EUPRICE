@@ -90,7 +90,7 @@ export default async function Home() {
         Tracked products
       </h2>
       <p className="mb-5 text-sm text-slate-500">
-        Ordered by the labor-time gap: products at the top punish low-wage consumers the most.
+        Ordered by the labor-time gap: products at the top punish the median-wage consumer the most.
       </p>
 
       {findings.length === 0 ? (
@@ -233,7 +233,7 @@ function ProductCard({ finding }: { finding: Finding }) {
             </div>
             {finding.minutes_ratio !== null && (
               <div className="mt-1 text-xs font-semibold text-indigo-700">
-                {finding.minutes_ratio.toFixed(1)}× more worktime for the low-wage consumer
+                {finding.minutes_ratio.toFixed(1)}× more worktime for the median-wage consumer
               </div>
             )}
           </div>

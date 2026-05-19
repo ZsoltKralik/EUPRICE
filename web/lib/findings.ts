@@ -6,7 +6,7 @@
  *  - cheapest & most-expensive country (in nominal EUR)
  *  - cheapest & most-expensive country (in minutes of median-wage work)
  *  - an `unfairness_score` for sorting — products are ranked by how much
- *    *more labor time* a low-wage consumer pays for the same physical SKU,
+ *    *more labor time* the median-wage consumer pays for the same physical SKU,
  *    not by raw EUR spread.
  *
  * Why a separate scoring metric? Two products can have the same EUR spread
