@@ -12,35 +12,40 @@ This is directly relevant to **European Commission policy on territorial supply 
 
 ## Status
 
-- **18 cross-EU products tracked** across drugstore essentials (14), baby essentials (3), and feminine hygiene (1). Every product has observations in ≥5 EU countries; DACH-only products are excluded.
-- All 18 have verified EAN-13 codes, real product images, and canonical retailer URLs
-- **143 real cross-EU price observations** captured via Playwright scrapes of DM's 10 country sites — zero sample data, every row links to the actual retailer product page and stores the JSON-LD EAN that page exposed at scrape time
-- **5 products with FULL 10-country coverage** (every DM country observed): Balea Deo Roll-On, Ebelin Wattepads, Ebelin Wattestäbchen Recycling, dontodent PRO+ Zahnpasta, dontodent Zahnbürste Soft Protect
-- Per-country coverage (of 18 products):
-  DE 17 · SK 17 · SI 16 · AT 15 · HU 15 · BG 14 · HR 14 · RO 13 · CZ 12 · PL 10
+- **29 cross-EU products tracked** across drugstore essentials (22), baby essentials (3), and feminine hygiene (4). Every product has observations in **≥5 EU countries** (every product in the public set genuinely compares cross-EU); DACH-only products are excluded.
+- All 29 have verified EAN-13 codes, real product images, and canonical retailer URLs
+- **236 real cross-EU price observations** captured via Playwright scrapes of DM's 10 country sites — zero sample data, every row links to the actual retailer product page and stores the JSON-LD EAN that page exposed at scrape time
+- **6 products with FULL 10-country coverage** (every DM country observed): Balea Deo Roll-On Sensitive, Ebelin Wattepads, Ebelin Wattestäbchen Recycling, dontodent PRO+ Zahnpasta, dontodent Zahnbürste Soft Protect, dontodent Mundspülung Total Power
+- Per-country coverage (of 29 products):
+  DE 28 · SK 28 · AT 27 · SI 26 · CZ 24 · HR 24 · HU 23 · BG 21 · RO 21 · PL 14
 
-### Headline findings (current scrape)
+### Headline findings (current scrape — top 15 by labor-time ratio)
 
 Same physical SKU, identical EAN-13, same retailer (DM). The "worktime" column is the price expressed as minutes of work at each country's median hourly wage (Eurostat `earn_ses_hourly`).
 
 | Product | Cheapest worktime | Most worktime | Ratio | Countries |
 |---|---|---|---|---|
-| Balea Mizellenwasser 3-in-1 Rose (400 ml) | 4 min (DE) | 36 min (BG) | **9.0×** | 8 |
+| Balea Mizellenwasser 3-in-1 Rose (400 ml) | 4 min (DE) | 36 min (BG) | **9.0×** | 9 |
+| dontodent Mundspülung Total Power (500 ml) | 2 min (DE) | 17 min (BG) | **7.2×** | 10 |
 | alverde Feuchtigkeitsshampoo (200 ml) | 4 min (DE) | 25 min (BG) | **6.9×** | 9 |
-| Ebelin Wattestäbchen (200 pcs cotton swabs) | 3 min (DE) | 18 min (BG) | **6.9×** | 10 |
+| Ebelin Wattestäbchen Recycling (200 pcs cotton swabs) | 3 min (DE) | 18 min (BG) | **6.9×** | 10 |
+| Balea Duschgel Glücksmoment (300 ml shower gel) | 2 min (DE) | 10 min (BG) | **6.5×** | 9 |
 | Balea Cremedusche Sensitive (300 ml shower gel) | 2 min (DE) | 10 min (BG) | **6.5×** | 7 |
 | Balea Deo Roll-On Sensitive (50 ml) | 2 min (DE) | 10 min (RO) | **6.1×** | 10 |
-| Balea Bodybalsam Sensitive (400 ml body lotion) | 3 min (DE) | 20 min (BG) | **6.0×** | 7 |
-| Ebelin Wattepads (70 pcs) | 2 min (DE) | 9 min (BG) | **5.2×** | 10 |
-| dontodent Toothbrush Soft Protect | 2 min (DE) | 12 min (BG) | **5.2×** | 10 |
+| alverde Naturkosmetik Duschgel (250 ml) | 3 min (DE) | 17 min (BG) | **6.0×** | 6 |
+| Balea Bodybalsam Sensitive (400 ml body lotion) | 3 min (DE) | 20 min (BG) | **6.0×** | 8 |
+| Jessa Tampons Cotton Super (16 pcs) | 5 min (DE) | 31 min (BG) | **5.8×** | 8 |
+| Jessa Slipeinlagen Cotton Normal (40 panty liners) | 4 min (DE) | 20 min (BG) | **5.4×** | 8 |
+| Balea Lippenpflege Lemon Cake (4.8 g lip balm) | 2 min (DE) | 9 min (BG) | **5.3×** | 7 |
+| Ebelin Wattepads (70 pcs cotton pads) | 2 min (DE) | 9 min (BG) | **5.2×** | 10 |
+| dontodent Zahnbürste Soft Protect (toothbrush) | 2 min (DE) | 12 min (BG) | **5.2×** | 10 |
 | Nivea Creme (150 ml) | 8 min (DE) | 40 min (BG) | **5.2×** | 9 |
-| **babylove Premium Windeln Gr 4 (40 diapers)** | 15 min (DE) | **76 min (BG)** | **5.0×** | 9 |
-| Jessa Tampons Cotton Normal (16 pcs) | 5 min (DE) | 22 min (BG) | **4.2×** | 6 |
-| dontodent PRO+ Zahnpasta (75 ml) | 7 min (DE) | 23 min (BG) | **3.5×** | 10 |
 
-**Pattern.** Bulgaria, Romania, Slovakia, and Hungary repeatedly land in the most-worktime column for products where Germany or Austria are cheapest. The same physical bottle of micellar water that an Austrian buys in 4 minutes costs a Bulgarian 36 minutes of work — for an identical EAN-13 SKU at the same retailer, with a 146 % nominal EUR spread on top of the wage difference.
+**Pattern.** Bulgaria dominates the most-worktime column with 13 of the 15 worst gaps; Germany dominates the cheapest-worktime column. The same physical bottle of mouthwash that a German buys in 2 minutes of work costs a Bulgarian 17 minutes — for an identical EAN-13 SKU at the same retailer (DM), no exception, no fuzzy matching.
 
-**The diaper case is the most consequential** for ongoing household burden — diapers are recurring (8–10 packs/month for an infant), so a 5× wage-time gap compounds into roughly 25 extra hours/year of work for a Bulgarian parent vs a German parent on identical product.
+**The babylove diaper case (#43) is the most consequential for ongoing household burden** — diapers are recurring (8–10 packs/month for an infant), so the 5.0× wage-time gap compounds into roughly 25 extra hours/year of work for a Bulgarian parent vs a German parent on identical product. With 9 countries observed, the diaper finding is robust to single-country anomalies.
+
+**The Jessa feminine-hygiene findings (#67 Tampons Cotton Super: 5.8×, #66 Slipeinlagen: 5.4×)** introduce a parallel argument — essential, non-substitutable, recurring purchases punish women in lower-wage member states most heavily.
 - Country median wages and VAT rates seeded for all 10 countries
 - Italian retailer (Tigotà) scaffolded for IT↔SK comparison
 - Both rendering backends wired: Playwright (default, free) and Jina Reader (paid alt)
