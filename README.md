@@ -12,23 +12,35 @@ This is directly relevant to **European Commission policy on territorial supply 
 
 ## Status
 
-- **12 cross-EU products tracked** across two categories — drugstore essentials (9) and baby essentials (3, all DM-private-label babylove SKUs: premium diapers, pants, fruit pouch). Every product has observations in ≥5 EU countries; DACH-only products excluded.
-- All 12 have verified EAN-13 codes, real product images, and canonical retailer URLs
-- **90 real cross-EU price observations** captured via Playwright scrapes of DM's 10 country sites — zero sample data, every row links to the actual retailer product page and stores the JSON-LD EAN that page exposed at scrape time
-- Per-country coverage (of 12 products):
-  DE 11 · SI 11 · HR 10 · AT 9 · HU 9 · RO 9 · SK 9 · BG 8 · CZ 8 · PL 6
+- **18 cross-EU products tracked** across drugstore essentials (14), baby essentials (3), and feminine hygiene (1). Every product has observations in ≥5 EU countries; DACH-only products are excluded.
+- All 18 have verified EAN-13 codes, real product images, and canonical retailer URLs
+- **143 real cross-EU price observations** captured via Playwright scrapes of DM's 10 country sites — zero sample data, every row links to the actual retailer product page and stores the JSON-LD EAN that page exposed at scrape time
+- **5 products with FULL 10-country coverage** (every DM country observed): Balea Deo Roll-On, Ebelin Wattepads, Ebelin Wattestäbchen Recycling, dontodent PRO+ Zahnpasta, dontodent Zahnbürste Soft Protect
+- Per-country coverage (of 18 products):
+  DE 17 · SK 17 · SI 16 · AT 15 · HU 15 · BG 14 · HR 14 · RO 13 · CZ 12 · PL 10
 
 ### Headline findings (current scrape)
 
-| Product | Cheapest worktime | Most worktime | Ratio |
-|---|---|---|---|
-| Balea Mizellenwasser 3-in-1 Rose (400 ml) | 4 min (DE) | 36 min (BG) | **9.0×** |
-| alverde Feuchtigkeitsshampoo (200 ml) | 4 min (DE) | 25 min (BG) | **6.9×** |
-| Balea Deo Roll-On Sensitive (50 ml) | 2 min (DE) | 10 min (RO) | **6.1×** |
-| Nivea Creme (150 ml) | 8 min (DE) | 40 min (BG) | **5.2×** |
-| **babylove Premium Windeln Gr 4 (40 pcs)** | 15 min (DE) | **76 min (BG)** | **5.0×** |
+Same physical SKU, identical EAN-13, same retailer (DM). The "worktime" column is the price expressed as minutes of work at each country's median hourly wage (Eurostat `earn_ses_hourly`).
 
-The diaper case is the most consequential — diapers are recurring essential purchases, so a 5× wage-time gap compounds into a real, ongoing burden on parents in lower-income EU member states.
+| Product | Cheapest worktime | Most worktime | Ratio | Countries |
+|---|---|---|---|---|
+| Balea Mizellenwasser 3-in-1 Rose (400 ml) | 4 min (DE) | 36 min (BG) | **9.0×** | 8 |
+| alverde Feuchtigkeitsshampoo (200 ml) | 4 min (DE) | 25 min (BG) | **6.9×** | 9 |
+| Ebelin Wattestäbchen (200 pcs cotton swabs) | 3 min (DE) | 18 min (BG) | **6.9×** | 10 |
+| Balea Cremedusche Sensitive (300 ml shower gel) | 2 min (DE) | 10 min (BG) | **6.5×** | 7 |
+| Balea Deo Roll-On Sensitive (50 ml) | 2 min (DE) | 10 min (RO) | **6.1×** | 10 |
+| Balea Bodybalsam Sensitive (400 ml body lotion) | 3 min (DE) | 20 min (BG) | **6.0×** | 7 |
+| Ebelin Wattepads (70 pcs) | 2 min (DE) | 9 min (BG) | **5.2×** | 10 |
+| dontodent Toothbrush Soft Protect | 2 min (DE) | 12 min (BG) | **5.2×** | 10 |
+| Nivea Creme (150 ml) | 8 min (DE) | 40 min (BG) | **5.2×** | 9 |
+| **babylove Premium Windeln Gr 4 (40 diapers)** | 15 min (DE) | **76 min (BG)** | **5.0×** | 9 |
+| Jessa Tampons Cotton Normal (16 pcs) | 5 min (DE) | 22 min (BG) | **4.2×** | 6 |
+| dontodent PRO+ Zahnpasta (75 ml) | 7 min (DE) | 23 min (BG) | **3.5×** | 10 |
+
+**Pattern.** Bulgaria, Romania, Slovakia, and Hungary repeatedly land in the most-worktime column for products where Germany or Austria are cheapest. The same physical bottle of micellar water that an Austrian buys in 4 minutes costs a Bulgarian 36 minutes of work — for an identical EAN-13 SKU at the same retailer, with a 146 % nominal EUR spread on top of the wage difference.
+
+**The diaper case is the most consequential** for ongoing household burden — diapers are recurring (8–10 packs/month for an infant), so a 5× wage-time gap compounds into roughly 25 extra hours/year of work for a Bulgarian parent vs a German parent on identical product.
 - Country median wages and VAT rates seeded for all 10 countries
 - Italian retailer (Tigotà) scaffolded for IT↔SK comparison
 - Both rendering backends wired: Playwright (default, free) and Jina Reader (paid alt)
