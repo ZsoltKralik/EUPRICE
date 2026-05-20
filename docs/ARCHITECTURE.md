@@ -218,12 +218,29 @@ DELETE FROM price WHERE url LIKE 'sample://%';
 
 | Route | Component | Description |
 |---|---|---|
-| `/` | server | Hero + product grid with images, prices, spreads |
-| `/map` | server + `MapClient` (client) | Interactive choropleth with product + metric pickers |
-| `/compare` | server | Leaderboard sorted by EUR spread with inline bars |
-| `/product/[id]` | server | Full breakdown: stats, bar charts, sources table |
-| `/about` | server | Methodology summary, links to docs |
+| `/` | server | Hero + headline-finding card (top labor-time gap) + **basket-aggregate callout** + product grid sorted by `unfairness_score` |
+| `/basket` | server | **Universal basket** (intersection of products in every country) + **pairwise basket** picker. Per-country bars, composition grid, construction-rules recap. |
+| `/compare` | server | Wage-time-gap leaderboard ranked by `minutes_ratio` |
+| `/map` | server + `MapClient` (client) | Interactive choropleth with product + metric pickers (nominal EUR / ex-VAT / minutes-of-work) |
+| `/product/[id]` | server | Wage-time gap panel, EUR/minutes-of-work charts, sources table, **"Cite this finding"** block + social-share buttons |
+| `/about` | server | Mission, methodology summary, fair-comparison bullets, press kit, sample citation |
 | `/api/products` | server route | JSON API mirror of `v_latest_prices` |
+
+Each `page.tsx` route has a co-located `opengraph-image.tsx` that renders a dynamic 1200×630 PNG via Next.js `next/og` (Satori). Sharing a product or basket URL on social previews with the wage-time number, not a generic logo.
+
+### Pure-function library
+
+`web/lib/findings.ts` holds the shared aggregation logic — used by `/`, `/basket`, `/compare`, and `/product/[id]`:
+
+| Function | Returns | Purpose |
+|---|---|---|
+| `buildFindings(rows)` | `Finding[]` | One per product with cheapest/dearest in both EUR + minutes, `unfairness_score`, sorted worst-first |
+| `headlineSentence(finding)` | `string \| null` | "14 min in SK vs 5 min in DE — 2.8× the labor time" |
+| `buildUniversalBasket(rows, version="v1")` | `Basket \| null` | Intersection of products observed in every country; identical SKU set everywhere |
+| `buildPairwiseBasket(rows, a, b)` | `Basket \| null` | Intersection of products observed in both A and B; bigger sample, single-pair scope |
+| `basketHeadlineSentence(basket)` | `string \| null` | "The 6-item universal basket costs 17 min of work in DE vs 89 min in BG — 5.2× the labor time" |
+
+All pure: take `LatestPriceRow[]`, return computed objects. No DB access, no side effects. The same data feeds the homepage, the basket page, and the per-product OG card.
 
 ### Components
 
@@ -283,11 +300,21 @@ Current migrations:
 
 ## Future work
 
-- Add Tigotà spider proper (Italy) — main missing piece for IT↔SK case study.
-- Add Müller spider (Italy + Switzerland coverage) — second pan-EU drugstore.
-- Add Rossmann spider (Poland depth) — third pan-EU drugstore.
-- Render Eurostat PLI on the map as a fourth metric (triangulation overlay).
-- Affordability-basket view: sum minutes-of-work for a representative basket of N SKUs per country.
-- Per-row `match_method` enum (`ean | sku | name | manual`) for explicit per-row filtering in published statistics.
-- robots.txt automation — store an `allowed` flag per `shop_country`.
-- Per-snapshot read-through cache — re-use archived HTML for development scrapes instead of re-fetching.
+See [docs/ROADMAP.md](ROADMAP.md) for the full prioritized list with sequencing rationale. Headlines:
+
+- **Müller** as a second pan-EU drugstore (Italy + Switzerland coverage) — unlocks cross-retailer EAN verification (the single biggest gap remaining in the methodology).
+- **Open Beauty Facts EAN reconciliation** — external check on retailer-claimed `gtin13` values.
+- **Tigotà** proper spider (Italy) — independent IT data alongside Müller-IT.
+- **Scheduled weekly scrape + drift detection** — catch SKU rotations and EAN mismatches automatically.
+- **Eurostat PLI overlay on `/map`** — fourth metric for triangulation against official price-level data.
+- **Per-row `match_method` enum** (`ean | sku | name | manual`) for explicit per-row filtering in published statistics.
+- **Multilingual UI** (DE/SK/IT) — let the case study reach non-English audiences in the affected markets.
+
+Done:
+- ✅ Strict EAN-or-DM-SKU matcher.
+- ✅ `scraped_ean` audit trail per row + 5-class audit pipeline.
+- ✅ Bidirectional pack-guard (multi-pack / unit-category / ±15 % size).
+- ✅ Migration tracker (`PRAGMA user_version`).
+- ✅ Open Graph cards (default, per-product, per-basket).
+- ✅ Universal + pairwise basket aggregates.
+- ✅ "Cite this finding" + social-share buttons on each product.

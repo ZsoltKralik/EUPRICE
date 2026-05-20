@@ -46,9 +46,27 @@ Same physical SKU, identical EAN-13, same retailer (DM). The "worktime" column i
 **The babylove diaper case (#43) is the most consequential for ongoing household burden** — diapers are recurring (8–10 packs/month for an infant), so the 5.0× wage-time gap compounds into roughly 25 extra hours/year of work for a Bulgarian parent vs a German parent on identical product. With 9 countries observed, the diaper finding is robust to single-country anomalies.
 
 **The Jessa feminine-hygiene findings (#67 Tampons Cotton Super: 5.8×, #66 Slipeinlagen: 5.4×)** introduce a parallel argument — essential, non-substitutable, recurring purchases punish women in lower-wage member states most heavily.
-- Country median wages and VAT rates seeded for all 10 countries
-- Italian retailer (Tigotà) scaffolded for IT↔SK comparison
-- Both rendering backends wired: Playwright (default, free) and Jina Reader (paid alt)
+
+### The basket aggregate
+
+Per-product findings can be dismissed as anecdotes; the basket aggregate cannot. The **universal basket** is the intersection of products observed in every EU country — currently 6 products (Balea Deo Roll-On Sensitive, Ebelin Wattepads, Ebelin Wattestäbchen Recycling, dontodent PRO+ Zahnpasta, dontodent Zahnbürste Soft Protect, dontodent Mundspülung Total Power). Every country pays for the **identical 6 SKUs**, no imputation, no fuzzy matching.
+
+| Country | Basket EUR (incl VAT) | Basket worktime |
+|---|---:|---:|
+| 🇩🇪 Germany    | €6.35 | **17 min** |
+| 🇦🇹 Austria    | €7.20 | 22 min |
+| 🇸🇮 Slovenia   | €8.20 | 38 min |
+| 🇨🇿 Czechia    | €8.33 | 45 min |
+| 🇭🇷 Croatia    | €7.75 | 46 min |
+| 🇵🇱 Poland     | €7.80 | 47 min |
+| 🇭🇺 Hungary    | €6.87 | 51 min |
+| 🇸🇰 Slovakia   | €8.00 | 53 min |
+| 🇷🇴 Romania    | €7.40 | 56 min |
+| 🇧🇬 Bulgaria   | €8.91 | **89 min** |
+
+**The same 6 daily essentials cost a German buyer 17 minutes of work and a Bulgarian buyer 89 minutes — 5.2× the labor time for the identical SKUs at the identical retailer.** A pairwise basket picker on `/basket` lets any two countries be compared on their own intersection (typically 13-25 products).
+
+### How we keep the comparison honest
 
 **Strict EAN-or-retailer-SKU matching**: every inserted price row satisfies one of two identity criteria — either (a) the scraped page's JSON-LD `gtin13` equals the seed EAN, OR (b) the scraped URL contains the same DM internal SKU id as the anchor country's URL (DM uses the same `/p/d/<NNNN>/` id across all its country domains for the same physical product, even when local EANs differ). If neither holds, no row is inserted for that country. Missing cells are honest; wrong cells are not.
 
@@ -56,14 +74,35 @@ Same physical SKU, identical EAN-13, same retailer (DM). The "worktime" column i
 
 **Audit trail per row**: every `price` row stores the actual `scraped_ean` from the JSON-LD on the matched page (migration 003). The audit script independently re-verifies identity claims by comparing scraped vs canonical EAN per row — so any future regression in the matcher becomes detectable on the next audit run.
 
-The web app at `http://localhost:3000` renders a product grid, an interactive EU choropleth, a spread leaderboard, and per-product breakdowns with the minutes-of-work chart.
+**Basket aggregation never imputes** missing prices. The universal basket excludes any SKU that lacks observations in some country; the pairwise basket uses only products observed in both countries of the pair. Sample size is shown next to every total.
+
+### Other infrastructure
+
+- Country median wages and VAT rates seeded for all 10 countries (Eurostat `earn_ses_hourly`, 2026 Q1 VAT publications)
+- Italian retailer (Tigotà) scaffolded for IT↔SK comparison (spider implementation pending)
+- Both rendering backends wired: Playwright (default, free) and Jina Reader (paid alt)
+
+## The web app (live at `http://localhost:3000`)
+
+| Route | What it shows |
+|---|---|
+| `/` | Product grid sorted by labor-time unfairness, with the single biggest finding as a hero card |
+| `/basket` | **Universal basket** + **pairwise basket** views with apples-to-apples country totals |
+| `/compare` | Wage-time-gap leaderboard ranked by `dearest_minutes / cheapest_minutes` |
+| `/map` | Interactive EU choropleth; switch metric (nominal EUR / ex-VAT / minutes-of-work) and product |
+| `/product/[id]` | Per-product breakdown — wage-time headline panel, per-country charts, sources table, **"Cite this finding"** block, social-share buttons |
+| `/about` | Mission, methodology summary, press kit, sample citation, JSON dump link |
+
+Each page has a dynamically-rendered Open Graph card (`/opengraph-image`, `/basket/opengraph-image`, `/product/[id]/opengraph-image`) so social previews display the wage-time number, not a generic logo.
 
 ## Documentation
 
 For the rigorous version of how this works:
 
-- **[docs/METHODOLOGY.md](docs/METHODOLOGY.md)** — research question, data sources, normalization, citation guidance. Read this first if you intend to publish findings.
-- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — codebase tour, data model, scraper layering, how to add a shop or country.
+- **[docs/METHODOLOGY.md](docs/METHODOLOGY.md)** — research question, data sources, normalization, the strict EAN-or-SKU matching rules, the basket aggregate (universal + pairwise) construction rules, citation guidance. Read this first if you intend to publish findings.
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — codebase tour, data model, scraper layering, web app structure, how to add a shop or country.
+- **[docs/ROADMAP.md](docs/ROADMAP.md)** — what's next: Müller as a second retailer (cross-retailer EAN verification), Open Beauty Facts EAN reconciliation, scheduled weekly scrapes with drift detection, multilingual UI.
+- **[CHANGELOG.md](CHANGELOG.md)** — public-facing history of dataset growth + matcher hardening + UI evolution.
 
 External references used in this project:
 
@@ -157,12 +196,24 @@ This produces a fully populated UI in a few minutes, with no retailer scraping. 
 ## Project layout
 
 ```
-data/products.csv           — what you maintain (10-row CSV)
-db/                          — schema + migrations + SQLite file
-docs/                        — METHODOLOGY + ARCHITECTURE
-scraper/                     — Python: spiders, fetcher, CLI
-scripts/                     — one-off tools (seed, enrich, export)
-web/                         — Next.js app
+data/products.csv            — canonical product list (29 rows currently); regenerated from DB after EAN bootstrap
+data/snapshots/              — archived scraped HTML (SHA-256 keyed; gitignored)
+db/schema.sql                — five-table SQLite schema + v_latest_prices view
+db/migrations/               — 001 country/VAT/wage seed, 002 Italy/Tigotà, 003 price.scraped_ean
+db/eu_prices.db              — the SQLite file (gitignored, regenerable from migrations)
+docs/                        — METHODOLOGY, ARCHITECTURE, ROADMAP
+scraper/                     — Python: spiders (dm.py), fetcher, FX, CLI orchestrator
+scripts/                     — one-off tools:
+                                 audit_pack_quality.py (5-class identity audit, CI-friendly)
+                                 capture_missing_eans.py (EAN bootstrap on DM Germany)
+                                 export_for_web.py (SQLite → web/data/*.json)
+                                 localize_images.py (CDN images → /web/public/images/)
+                                 rescrape_product.py (one-product targeted re-scrape)
+web/app/                     — Next.js App Router pages (/, /basket, /compare, /map, /product/[id], /about)
+                                 + dynamic Open Graph image routes
+web/lib/findings.ts          — pure functions: buildFindings + buildUniversalBasket + buildPairwiseBasket
+web/data/                    — JSON snapshots regenerated by export_for_web.py
+web/public/images/<id>.jpg   — localized product images
 ```
 
 ## Adding a product
