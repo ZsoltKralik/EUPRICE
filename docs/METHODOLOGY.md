@@ -181,6 +181,48 @@ Justifications:
 - **Better than PPP-adjusted EUR for consumer narrative**: PPP indices are abstract; "minutes of work" is concrete and quotable.
 - **Aligns with the policy framing**: the harm from territorial supply constraints is felt unequally — it falls hardest on consumers in low-wage countries.
 
+## 6a. The basket aggregate
+
+Per-product findings answer "*how much does this one item cost in worktime across the EU?*" The basket aggregate answers a different and equally important question: "*how much of someone's working day does a representative bundle of everyday essentials cost in each country?*"
+
+Aggregating prices across products is methodologically dangerous, because if each country's basket contains a *different* set of products, the resulting sums are not comparable. EUPRICE defines two strict basket views to preserve apples-to-apples integrity.
+
+### 6a.1 Universal basket (primary)
+
+The universal basket contains only products that have been observed in **every** EU country in the dataset. The basket is the intersection across all observed countries.
+
+- Today's universal basket: 6 products (Balea Deo Roll-On Sensitive, Ebelin Wattepads, Ebelin Wattestäbchen Recycling, dontodent PRO+ Zahnpasta, dontodent Zahnbürste Soft Protect, dontodent Mundspülung Total Power). Every one of the 10 DM EU countries (DE/AT/CZ/SK/HU/PL/SI/HR/RO/BG) has all 6.
+- Aggregate per country = sum of the 6 EUR prices (and the 6 worktime values).
+- Every country's total uses the same 6 SKUs. This is the apples-to-apples guarantee.
+
+### 6a.2 Pairwise basket (secondary)
+
+For any two specific countries A and B, the pairwise basket contains products observed in **both** A and B. Different country pairs yield different baskets, but each pair is still apples-to-apples *within itself*.
+
+- DE↔BG pairwise basket (today): ~22 products observed in both
+- DE↔PL pairwise basket (today): ~14 products
+- Pairwise totals are valid for that specific pair only — **cross-pair ratios are non-transitive** and the UI says so explicitly.
+
+### 6a.3 Hard rules
+
+| Rule | Reason |
+|---|---|
+| **Never impute missing prices.** | If a country lacks an SKU, that SKU is excluded — for the universal basket entirely, for the pairwise basket only from the pairs that lack it. No fabricated data. |
+| **Version the basket.** | The universal basket is named (`v1`, `v2`, …) and its composition + snapshot date are stored alongside any published total. When new SKUs are added and the basket grows, the prior version stays citable. |
+| **Display N alongside the total.** | Every basket total is shown as "€X / Y min (n products)" so sample size is never hidden. |
+| **VAT-inclusive primary, ex-VAT secondary.** | Consumer perspective leads; ex-VAT isolates retailer/manufacturer pricing. |
+| **Promo rows flagged in the aggregate.** | If any product in a country's basket is on promo at scrape time, the country's total is badged; a "non-promo total" is also computable. |
+| **FX snapshot per row.** | Each `price` row stores its own `fx_rate`; basket sums use those stored values, so the aggregate is reproducible against the ECB feed on the scrape date. |
+| **No cross-pair transitive claims.** | If DE↔BG is 7×, DE↔PL is 3×, the UI does not multiply, divide, or compose these into a BG↔PL claim. |
+
+### 6a.4 What the basket adds to the case study
+
+A per-product finding ("micellar water costs 9× more worktime in BG") is striking but easy to dismiss as a single anomaly. The basket aggregate makes the same claim *cumulatively*:
+
+> *The universal basket of 6 daily essentials costs an Austrian buyer ~50 minutes of work, but a Bulgarian buyer ~250 minutes — 5× the labor time, for the identical six SKUs at the identical retailer, no exceptions, no fuzzy matching.*
+
+That number is harder to attribute to a single negotiating quirk; it is evidence of a systematic pattern.
+
 ## 7. Promotions
 
 Promos distort point-in-time comparisons. Each `price` row carries an `is_promo` flag and, when known, the regular (non-promo) reference price. Behavior:

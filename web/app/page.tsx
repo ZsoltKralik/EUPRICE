@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { listLatest, listProducts, type LatestPriceRow, type ProductLite } from "@/lib/db";
-import { buildFindings, headlineSentence, type Finding } from "@/lib/findings";
+import {
+  buildFindings,
+  buildUniversalBasket,
+  basketHeadlineSentence,
+  type Finding,
+  type Basket,
+} from "@/lib/findings";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +42,7 @@ export default async function Home() {
 
   const findings = buildFindings(rows);
   const headline = findings.find((f) => f.minutes_ratio !== null);
+  const universalBasket = buildUniversalBasket(rows);
   const totalCountries = new Set(rows.map((r) => r.country_code)).size;
 
   return (
@@ -85,6 +92,9 @@ export default async function Home() {
 
       {/* headline finding card */}
       {headline && <HeadlineCard finding={headline} />}
+
+      {/* basket callout — the cumulative story */}
+      {universalBasket && <BasketCallout basket={universalBasket} />}
 
       <h2 className="mb-1 text-xl font-semibold tracking-tight text-slate-900">
         Tracked products
@@ -250,6 +260,54 @@ function ProductCard({ finding }: { finding: Finding }) {
           <span>·</span>
           <span>{finding.countries_observed} countries</span>
         </div>
+      </div>
+    </Link>
+  );
+}
+
+function BasketCallout({ basket }: { basket: Basket }) {
+  const c = basket.cheapest_minutes;
+  const d = basket.dearest_minutes;
+  const ratio = basket.minutes_ratio;
+  if (!c || !d || ratio === null) return null;
+  return (
+    <Link
+      href="/basket"
+      className="group mb-12 block overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-soft hover:border-indigo-200 hover:shadow-lift sm:p-7"
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="inline-flex items-center rounded-full bg-slate-900 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+          The basket aggregate
+        </span>
+        <span className="text-xs text-slate-500">
+          {basket.basket_size} essentials × {basket.countries.length} countries — apples-to-apples
+        </span>
+        <span className="ml-auto text-xs font-medium text-indigo-700 group-hover:text-indigo-900">
+          Open the basket view →
+        </span>
+      </div>
+      <p className="mt-3 text-base leading-relaxed text-slate-800 sm:text-lg">
+        Buy the same {basket.basket_size}-item basket of daily drugstore essentials in every EU
+        country and the cumulative cost is{" "}
+        <span className="font-bold text-emerald-700">
+          {c.total_minutes.toFixed(0)} minutes of work in {c.country_code}
+        </span>
+        ,{" "}
+        <span className="font-bold text-rose-700">
+          {d.total_minutes.toFixed(0)} minutes in {d.country_code}
+        </span>{" "}
+        —{" "}
+        <span className="font-bold text-indigo-700">{ratio.toFixed(1)}× the labor time</span>{" "}
+        for identical SKUs at the identical retailer.
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+        <span>
+          €{basket.cheapest_eur!.total_eur.toFixed(2)} → €{basket.dearest_eur!.total_eur.toFixed(2)}
+        </span>
+        <span>·</span>
+        <span>{(basket.eur_spread_pct ?? 0).toFixed(0)}% EUR spread</span>
+        <span>·</span>
+        <span>No imputation — universal-intersection basket only</span>
       </div>
     </Link>
   );
