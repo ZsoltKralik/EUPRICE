@@ -33,6 +33,15 @@ export type Finding = {
   size_unit: string | null;
   ean: string | null;
   countries_observed: number;
+  // Shops this product is observed at — one entry per shop_code (e.g. "dm",
+  // "mueller"). Lets the UI surface "multi-retailer" badges without joining
+  // back to the raw rows.
+  shops: string[];
+  // Cross-retailer verification: true when two or more retailers in the same
+  // country have independently observed the same EAN-13 for this product.
+  // The bar for "audit-proof" identity — see methodology.
+  cross_verified: boolean;
+  cross_verified_countries: string[];  // countries where ≥2 retailers agreed
   cheapest_eur: { country_code: string; price_eur: number; minutes: number | null };
   dearest_eur:  { country_code: string; price_eur: number; minutes: number | null };
   cheapest_minutes: { country_code: string; minutes: number; price_eur: number } | null;
@@ -95,6 +104,26 @@ export function buildFindings(rows: LatestPriceRow[]): Finding[] {
         ? minutes_ratio * 100
         : eur_spread_pct;
 
+    // Shop / cross-retailer roll-up. A product is "cross-verified" if any
+    // single country has observations from two or more retailers, AND those
+    // retailers report identical EANs. We trust v_latest_prices.ean (the
+    // product-table canonical) as the comparison key — same logic as
+    // scripts/audit_cross_retailer.py.
+    const shops = Array.from(new Set(group.map((r) => r.shop_code))).sort();
+    const cross_countries = new Set<string>();
+    if (shops.length >= 2) {
+      const byCountry = new Map<string, LatestPriceRow[]>();
+      for (const r of group) {
+        if (!byCountry.has(r.country_code)) byCountry.set(r.country_code, []);
+        byCountry.get(r.country_code)!.push(r);
+      }
+      for (const [cc, rows] of byCountry) {
+        if (new Set(rows.map((r) => r.shop_code)).size < 2) continue;
+        const eans = new Set(rows.map((r) => r.ean).filter(Boolean));
+        if (eans.size === 1) cross_countries.add(cc);
+      }
+    }
+
     out.push({
       product_id: pid,
       producer: sample.producer,
@@ -106,6 +135,9 @@ export function buildFindings(rows: LatestPriceRow[]): Finding[] {
       size_unit: sample.size_unit,
       ean: sample.ean,
       countries_observed: group.length,
+      shops,
+      cross_verified: cross_countries.size > 0,
+      cross_verified_countries: Array.from(cross_countries).sort(),
       cheapest_eur: {
         country_code: cheapestEurRow.country_code,
         price_eur: cheapestEurRow.price_eur,

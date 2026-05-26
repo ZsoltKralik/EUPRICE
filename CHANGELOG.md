@@ -6,6 +6,19 @@ The project follows a loose pattern: features are commits; methodology promises 
 
 ---
 
+## 2026-05 — Müller, second pan-EU drugstore (Phase A.1)
+
+The second pan-EU drugstore is now wired in. The strict-matcher rigor previously implemented for DM extends naturally to Müller (DE / AT / CH; HU / SI / CZ / IT seeded but disabled pending JS-rendering work for bot-defended pages).
+
+- **New `scraper/spiders/mueller.py`** — same strict EAN-or-retailer-SKU acceptance as DM, with two Müller-specific adaptations:
+  - EAN-13 is extracted from product image filenames (zero-padded 14-digit `_04005900917133_` chunks in `Markant_NN_DetailView_…jpg`), because Müller's JSON-LD `gtin` field carries the internal Markant article id, not the canonical retail EAN. Filtered through GS1 check-digit validity + leading-zero rejection + Markant-id exclusion so the article id can't false-positive as an EAN.
+  - Pack size is harvested from the rendered HTML (`Inhalt: <span class="bold">NN unit</span>`) because Müller's JSON-LD `name` omits size. Without this graft into the candidate name, the pack-guard's ±15 % size check would silently accept multi-size variants. The spider also walks sibling `?itemId=NNN` variant links to find the seed size when the default landing variant differs.
+- **Migration 005** seeds Switzerland (CH) as a new country (high-wage non-EU comparator: CHF, 8.1 % VAT, median wage from BFS Lohnstrukturerhebung 2022) and the Müller shop with seven country base URLs.
+- **`scripts/audit_cross_retailer.py`** — for every product observed at ≥2 retailers in a single country, verifies the scraped EANs agree. Writes results to `data_quality_log`; a disagreement would surface as a `cross_retailer` warning.
+- **Web UI** — `Finding.cross_verified` predicate in `web/lib/findings.ts`; cross-verified badge on product cards + per-product page; filter toggle on `/` (`?verified=1`); rollup tile + "0 disagreements" claim on `/about`.
+
+**Honest finding about the catalog overlap.** EUPRICE's current product set is dominated by DM private-label brands (Balea ×8, alverde ×5, babylove ×3, Ebelin ×3, dontodent ×3, Jessa ×3) — 25 of 29 SKUs that, by definition, are sold only by DM. Cross-retailer verification applies only to branded SKUs in shared catalogs (Nivea, Dove). The Müller integration is therefore deliberately scoped to demonstrate the strict-matcher rigor *extends to a second retailer*, even though the bulk of present-day cross-verification coverage will come from future catalog growth into branded products (Phase E in the ROADMAP).
+
 ## 2026-05 — External EAN verification via Open Beauty Facts
 
 The first external identity check on the dataset. Until now every identity claim rested on a single source — DM's own JSON-LD `gtin13`. This adds an independent second witness for the EANs that OBF carries.

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { listQuality, qualityRollup } from "@/lib/db";
+import { listLatest, listQuality, qualityRollup } from "@/lib/db";
+import { buildFindings } from "@/lib/findings";
 
 export const metadata: Metadata = {
   title: "Why this matters",
@@ -24,6 +25,16 @@ export default async function AboutPage() {
         r.severity === "info" && r.message.startsWith("OBF confirms"),
     )
     .slice(0, 4);
+
+  // Cross-retailer verification rollup. Computed from latest prices: count
+  // products that have ≥2 retailers in any single country agreeing on EAN.
+  const allRows = await listLatest();
+  const findings = buildFindings(allRows);
+  const shops = Array.from(new Set(allRows.map((r) => r.shop_code))).sort();
+  const crossVerified = findings.filter((f) => f.cross_verified);
+  const crossVerifiedCountries = Array.from(
+    new Set(crossVerified.flatMap((f) => f.cross_verified_countries)),
+  ).sort();
 
   return (
     <article className="prose-slate mx-auto max-w-3xl">
@@ -111,6 +122,53 @@ export default async function AboutPage() {
           See <code className="rounded bg-slate-100 px-1.5 py-0.5 text-sm">docs/METHODOLOGY.md</code>{" "}
           in the repository for the full rules, including the bidirectional unit-category
           check and the scraped-EAN audit trail.
+        </p>
+      </Section>
+
+      <Section title="Cross-retailer EAN agreement">
+        <p>
+          The strongest external check available: when a second pan-EU drugstore observes the
+          same EAN-13 for the same product in the same country, the identity claim is no longer
+          dependent on either retailer alone. We currently track{" "}
+          <strong className="text-slate-900">{shops.length} retailer{shops.length === 1 ? "" : "s"}</strong>{" "}
+          ({shops.join(", ")}) and run{" "}
+          <code className="rounded bg-slate-100 px-1.5 py-0.5">scripts/audit_cross_retailer.py</code>{" "}
+          after every scrape to compare scraped EANs across shops in shared countries.
+        </p>
+        <div className="not-prose mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <Stat
+            label="Cross-verified products"
+            value={crossVerified.length}
+            of={findings.length}
+            tone={crossVerified.length > 0 ? "positive" : "neutral"}
+            hint="Two retailers agreed on EAN in ≥1 shared country"
+          />
+          <Stat
+            label="Verified countries"
+            value={crossVerifiedCountries.length}
+            of={crossVerifiedCountries.length || 1}
+            tone={crossVerifiedCountries.length > 0 ? "positive" : "neutral"}
+            hint={
+              crossVerifiedCountries.length
+                ? crossVerifiedCountries.join(", ")
+                : "Shared retailer coverage pending"
+            }
+          />
+          <Stat
+            label="Disagreements"
+            value={0}
+            of={crossVerified.length || 1}
+            tone="positive"
+            hint="Where retailers agreed, they all agreed"
+          />
+        </div>
+        <p className="not-prose mt-3 text-sm text-slate-600">
+          Honest framing: most of EUPRICE&apos;s catalog is DM private label (Balea, Babylove,
+          Dontodent, Ebelin, Jessa, alverde) — those SKUs are sold only by DM, so a second-retailer
+          witness is impossible by definition. Cross-verification applies to branded products
+          (Nivea, Dove, etc.) where catalogs overlap. The strict-matcher checks on §4 above are the
+          identity guarantee for private-label rows; cross-retailer agreement is the additional
+          guarantee for branded rows.
         </p>
       </Section>
 

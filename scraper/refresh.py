@@ -43,6 +43,7 @@ from .core.models import ProductSpec, ShopCountry
 from .core.normalize import to_eur
 from .spiders.base import Spider
 from .spiders.dm import DMSpider
+from .spiders.mueller import MuellerSpider
 
 app = typer.Typer(add_completion=False, help="EUPRICE scraper")
 console = Console()
@@ -58,6 +59,7 @@ log = logging.getLogger("euprice")
 
 SPIDER_REGISTRY: dict[str, type[Spider]] = {
     "dm": DMSpider,
+    "mueller": MuellerSpider,
 }
 
 

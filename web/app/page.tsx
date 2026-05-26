@@ -17,7 +17,13 @@ export const metadata: Metadata = {
     "Identical drugstore SKUs cost more — in real labor time — for consumers in lower-wage EU member states. Verified product-by-product across 10 countries.",
 };
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ verified?: string }>;
+}) {
+  const sp = await searchParams;
+  const verifiedOnly = sp.verified === "1";
   let rows: LatestPriceRow[] = [];
   let allProducts: ProductLite[] = [];
   let dbError: string | null = null;
@@ -44,6 +50,8 @@ export default async function Home() {
   const headline = findings.find((f) => f.minutes_ratio !== null);
   const universalBasket = buildUniversalBasket(rows);
   const totalCountries = new Set(rows.map((r) => r.country_code)).size;
+  const totalShops = new Set(rows.map((r) => r.shop_code)).size;
+  const crossVerifiedCount = findings.filter((f) => f.cross_verified).length;
 
   return (
     <div>
@@ -83,11 +91,21 @@ export default async function Home() {
         </div>
 
         {/* quick stats */}
-        <div className="mt-8 grid grid-cols-3 gap-3 max-w-xl">
+        <div className="mt-8 grid grid-cols-2 gap-3 max-w-2xl sm:grid-cols-4">
           <Stat value={allProducts.length} label="cross-EU products" />
           <Stat value={totalCountries} label="countries" />
+          <Stat value={totalShops} label={totalShops > 1 ? "retailers" : "retailer"} />
           <Stat value={rows.length} label="verified observations" />
         </div>
+        {crossVerifiedCount > 0 && (
+          <p className="mt-3 max-w-2xl text-xs text-slate-500">
+            <span className="mr-1 inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-1.5 py-0.5 font-semibold text-sky-700">
+              ✓ cross-verified
+            </span>
+            {crossVerifiedCount} product{crossVerifiedCount === 1 ? "" : "s"} observed at two
+            independent retailers in the same country with identical EAN-13.
+          </p>
+        )}
       </section>
 
       {/* headline finding card */}
@@ -96,20 +114,59 @@ export default async function Home() {
       {/* basket callout — the cumulative story */}
       {universalBasket && <BasketCallout basket={universalBasket} />}
 
-      <h2 className="mb-1 text-xl font-semibold tracking-tight text-slate-900">
-        Tracked products
-      </h2>
-      <p className="mb-5 text-sm text-slate-500">
-        Ordered by the labor-time gap: products at the top punish the median-wage consumer the most.
-      </p>
+      <div className="mb-1 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight text-slate-900">
+            Tracked products
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Ordered by the labor-time gap: products at the top punish the median-wage consumer the most.
+          </p>
+        </div>
+        {crossVerifiedCount > 0 && (
+          <div className="inline-flex shrink-0 items-center gap-0 rounded-lg border border-slate-200 bg-white p-0.5 text-xs font-medium shadow-soft">
+            <Link
+              href="/"
+              className={`rounded-md px-3 py-1.5 ${
+                !verifiedOnly
+                  ? "bg-slate-900 text-white"
+                  : "text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              All ({findings.length})
+            </Link>
+            <Link
+              href="/?verified=1"
+              className={`rounded-md px-3 py-1.5 ${
+                verifiedOnly
+                  ? "bg-sky-600 text-white"
+                  : "text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              ✓ Cross-verified ({crossVerifiedCount})
+            </Link>
+          </div>
+        )}
+      </div>
+      <div className="mb-5" />
 
       {findings.length === 0 ? (
         <EmptyState />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {findings.map((f) => (
+          {(verifiedOnly ? findings.filter((f) => f.cross_verified) : findings).map((f) => (
             <ProductCard key={f.product_id} finding={f} />
           ))}
+        </div>
+      )}
+      {verifiedOnly && findings.filter((f) => f.cross_verified).length === 0 && (
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600">
+          No products are cross-verified yet. Cross-verification requires a second retailer
+          observing the same EAN-13 in a shared country.{" "}
+          <Link href="/about" className="font-medium text-indigo-700 hover:text-indigo-900">
+            Learn more
+          </Link>
+          .
         </div>
       )}
     </div>
@@ -200,6 +257,14 @@ function ProductCard({ finding }: { finding: Finding }) {
           />
         ) : (
           <div className="text-xs uppercase tracking-wide text-slate-400">no image</div>
+        )}
+        {finding.cross_verified && (
+          <span
+            title={`Two retailers independently observed the same EAN-13 in ${finding.cross_verified_countries.join(", ")}`}
+            className="absolute left-3 top-3 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700 ring-1 ring-sky-200"
+          >
+            ✓ cross-verified
+          </span>
         )}
         {finding.any_promo && (
           <span className="absolute right-3 top-3 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-700 ring-1 ring-rose-200">

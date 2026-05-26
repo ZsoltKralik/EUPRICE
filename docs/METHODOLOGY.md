@@ -12,14 +12,15 @@ If you cite an EUPRICE figure in published work, please follow the [citation gui
 
 The site is built to support a policy claim — *"EU consumers in lower-wage countries pay more, in real labor time, for identical drugstore SKUs"* — and that claim is only as strong as the identity guarantees underneath every row. This is the 60-second methodological case for trusting the numbers:
 
-1. **Same physical SKU.** Every price row's source page has been verified to expose the seed EAN-13 in its JSON-LD `gtin13`. The scraped EAN is preserved per row (`price.scraped_ean`) so the audit can re-verify identity at any time.
-2. **Same retailer group.** Currently DM Drogerie Markt only. No cross-retailer averaging that would mix supply-chain effects with retail-margin effects.
-3. **Same retailer-internal SKU id.** When EAN-13 codes diverge between countries (regionally re-labeled SKUs), we accept a row only when DM's own `/p/d/<NNNN>/` id matches between the anchor country's URL and the scraped country's URL.
-4. **Pack-guard validation.** Multi-pack markers, unit-category mismatches (200 ml seed vs 100 g scrape), and size deviations greater than ±15 % are rejected automatically. Catches the wrong-product-line failures common to text-search matchers.
-5. **Minimum coverage threshold.** Every product on the public site has observations in at least 5 EU countries. Two German-speaking neighbors aren't a cross-EU finding, so DACH-only products are excluded.
-6. **Append-only history with reproducible snapshots.** Every scraped HTML page is archived locally with a SHA-256 fingerprint on the row, so any specific finding can be re-verified against the exact bytes that were parsed.
+1. **Same physical SKU.** Every price row's source page has been verified to expose the seed EAN-13 in its JSON-LD `gtin13` (DM) or as a zero-padded 14-digit chunk in the page's product-image filenames (Müller). The scraped EAN is preserved per row (`price.scraped_ean`) so the audit can re-verify identity at any time.
+2. **Same retailer group.** Within a single retailer per row. No cross-retailer averaging that would mix supply-chain effects with retail-margin effects. Two pan-EU drugstores currently implemented: DM and Müller.
+3. **Same retailer-internal SKU id.** When EAN-13 codes diverge between countries (regionally re-labeled SKUs), we accept a row only when the retailer's own internal id matches (`/p/d/<NNNN>/` on DM, `/p/<slug>-<NNNN>/` on Müller).
+4. **Pack-guard validation.** Multi-pack markers, unit-category mismatches (200 ml seed vs 100 g scrape), and size deviations greater than ±15 % are rejected automatically. Catches the wrong-product-line failures common to text-search matchers. On Müller, the pack size is harvested from the rendered HTML (`Inhalt: <span>NN unit</span>`) since the JSON-LD `name` omits it, and the spider walks sibling-variant `?itemId=NNN` links to find the seed size when the default landing page is a different size.
+5. **External identity verification.** Every EAN is checked against [Open Beauty Facts](https://world.openbeautyfacts.org/) and (where catalogs overlap) against an independent second retailer. Results are written to `data_quality_log` (append-only) and surfaced on `/about`.
+6. **Minimum coverage threshold.** Every product on the public site has observations in at least 5 EU countries. Two German-speaking neighbors aren't a cross-EU finding, so DACH-only products are excluded.
+7. **Append-only history with reproducible snapshots.** Every scraped HTML page is archived locally with a SHA-256 fingerprint on the row, so any specific finding can be re-verified against the exact bytes that were parsed.
 
-If any of these break — e.g. a future spider regression silently re-introduces wrong-product matches — `scripts/audit_pack_quality.py` will surface it on the next audit run.
+If any of these break — e.g. a future spider regression silently re-introduces wrong-product matches — `scripts/audit_pack_quality.py` (5-class fatal-flag audit) plus `scripts/audit_cross_retailer.py` (DM↔Müller EAN agreement in shared countries) will surface it on the next audit run.
 
 ## 1. Research question
 
@@ -48,6 +49,7 @@ Online product pages from retailers operating in multiple EU countries.
 | Shop | Countries | Status |
 |---|---|---|
 | **[DM Drogerie Markt](https://www.dm.de)** | DE, AT, SK, CZ, HU, PL, SI, HR, RO, BG | implemented |
+| **[Müller](https://www.mueller.de)** | DE, AT, CH (HU, SI, CZ, IT seeded but disabled — bot defenses) | implemented; cross-verifies DM EANs in DE+AT, adds Switzerland (high-wage non-EU comparator) |
 | **[Tigotà](https://www.tigota.it)** | IT | scaffold; needed for IT↔SK comparisons |
 
 Retailers are chosen because they (a) operate cross-border with comparable catalogs and (b) expose structured product data (JSON-LD with `gtin13`) on detail pages, which makes EAN-based matching reliable.
@@ -132,13 +134,23 @@ The audit classifies suspect rows into:
 
 | Class | Meaning |
 |---|---|
-| **EAN_DIFF** | Scraped EAN differs from canonical EAN AND the DM-SKU also differs. Hard fail. |
+| **EAN_DIFF** | Scraped EAN differs from canonical EAN AND the retailer-SKU also differs. Hard fail. |
 | **CATEGORY** | Seed unit category and scrape unit category disagree (volume↔weight↔piece). Hard fail. |
 | **MULTI** | Multi-pack indicator in the scraped name. Hard fail. |
 | **SIZE** | Same-category size deviates > 15 %. Hard fail. |
 | **TOKEN_MISS** | Seed name tokens missing from scrape. Soft warning — typically a cross-language naming difference (Mizellenwasser → Micelárna voda). Informational, not a quality failure. |
 
 A clean dataset has zero EAN_DIFF / CATEGORY / MULTI / SIZE flags.
+
+### 4.6 External identity verification
+
+Internal consistency is necessary but not sufficient. Two complementary checks turn "the retailer says this gtin13 is X" into "multiple independent sources say this gtin13 is X":
+
+**Open Beauty Facts (`scripts/verify_eans_against_obf.py`).** For every EAN in the catalog, query the [OBF community registry](https://world.openbeautyfacts.org/) and classify the response. Confirmed = OBF brand + size agree with our DB; warning = brand/size disagree; stub = EAN known but no metadata; miss = EAN not in OBF. Results land in `data_quality_log` (append-only) and are surfaced on `/about`. OBF coverage of private-label drugstore SKUs is thin (Balea, Babylove, Dontodent, Ebelin are largely uncatalogued), so this check is a partial witness — the cross-retailer check below is the broader path.
+
+**Cross-retailer agreement (`scripts/audit_cross_retailer.py`).** When two retailers in the same country have both observed a price for the same canonical product, the script verifies their scraped EANs agree. A row is **cross-verified** when this check passes. The UI shows a "✓ cross-verified" badge on every product that has at least one country with two retailer witnesses on the same EAN. This is the strongest identity guarantee EUPRICE offers; it currently applies to branded products in shared catalogs (Nivea, Dove), since DM private labels (Balea etc.) by definition have no second-retailer witness.
+
+A row that is internally consistent (strict-matcher accepted) but has zero external witnesses remains in the dataset — the strict matcher is itself rigorous — but is not displayed with the cross-verified badge. Where external witnesses contradict (warning rows), the row is kept and the discrepancy surfaces as a `data_quality_log` warning for follow-up.
 
 ### 4.2 Local naming
 

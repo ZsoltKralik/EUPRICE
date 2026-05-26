@@ -29,17 +29,32 @@ Single retailer (DM), strict identity matching, audited dataset, fairness-focuse
 
 ---
 
-## Phase A — Cross-retailer verification (next, highest priority)
+## Phase A — Cross-retailer verification (in progress)
 
-**Why this is the next phase, not "add 100 more products."** Right now the dataset's identity claim depends on DM's own JSON-LD `gtin13`. If DM mis-labels a barcode in one country (it happens — retailers reuse SKU IDs and recycle EANs), no automated check would catch it. A second pan-EU drugstore observing the same EAN at similar prices in a shared country (DE, AT, HU, CZ, PL) is the cleanest possible verification — and it doubles cross-country coverage for free.
+**Why this is the highest-priority phase, not "add 100 more products."** Until Phase B.1 landed, the dataset's identity claim depended on DM's own JSON-LD `gtin13`. If DM mis-labels a barcode in one country (it happens — retailers reuse SKU IDs and recycle EANs), no automated check would catch it. A second pan-EU drugstore observing the same EAN at similar prices in a shared country is the cleanest possible verification — and it doubles cross-country coverage for free.
 
-### A.1 — Müller spider
+### A.1 — Müller spider (✅ infrastructure done; coverage growth needed)
 
-- **Coverage**: DE, AT, CH, HU, SI, HR, CZ, **IT** (8 countries). The IT addition is the originally-motivating case-study angle.
-- **Switzerland** is a high-wage non-EU comparator that strengthens the wage-time framing.
-- Müller's product detail pages expose JSON-LD with `gtin13` and use a stable cross-country `/c/<id>/p` URL pattern — same playbook as DM.
-- Expected to bot-defend more aggressively than DM. Mitigation: 3 s throttle per domain, polite UA, fall back to Jina Reader on a per-country basis (`Fetcher` already wires both backends).
-- Acceptance check after build: every product in our catalog observed at both DM-DE and Müller-DE must have a matching EAN. If they ever disagree, that's a finding worth investigating.
+- **Implemented**: `scraper/spiders/mueller.py` with strict EAN-or-Müller-SKU acceptance, GS1-validated EAN extraction from image filenames, HTML-derived pack-size grafting onto JSON-LD `name`, and sibling-variant `?itemId=NNN` walking.
+- **Active countries**: DE, AT, CH. CH is a high-wage non-EU comparator that strengthens the wage-time framing.
+- **Seeded but disabled** (active=0 in shop_country): HU, SI, CZ, IT. Bot defenses and client-side rendering require Jina Reader fallback or full Playwright JS rendering — a deferred increment.
+- **Hard "no" for HR**: domain doesn't resolve (no Müller online shop).
+- **Catalog-overlap reality**: 25 of 29 current products are DM private labels (Balea, alverde, Babylove, Ebelin, Jessa, Dontodent), which Müller does not stock. Cross-retailer verification can only fire on branded products in shared catalogs. Phase A.1.1 below addresses this.
+- **Verification check**: `scripts/audit_cross_retailer.py` walks every (product, country) cell with ≥2 retailers and reports EAN agreement.
+
+### A.1.1 — Branded-product catalog growth (next)
+
+To unlock the Müller cross-verification path for more than 1–2 SKUs, add 10–15 branded drugstore products that DM and Müller both stock in the same pack size (Nivea face cream variants, Dove soap, NIVEA shampoo, Schauma, Pantene, Garnier face wash, etc.). Each branded product, once added:
+- Gets DE/AT/CH/SK/etc. observations from DM,
+- Gets DE/AT/CH observations from Müller,
+- Becomes cross-verified in DE+AT (the shared catalog overlap),
+- Adds Switzerland coverage for that SKU.
+
+This is the dataset growth that converts the Müller infrastructure from "ready" to "actively comparing".
+
+### A.1.2 — Müller variant resolution via JS rendering
+
+Müller groups all pack-size variants of one product under one `/p/<slug>-<sku>/` URL with the active variant selected client-side via `?itemId=NNN`. The static-HTML JSON-LD payload is the same regardless of `?itemId`, so the current variant walk works only when the seed size happens to be the default landing variant. Fetching variants with full Playwright rendering would unlock size-aware variant matching at the cost of ~2 minutes per variant. Worth doing for branded-SKU growth in A.1.1.
 
 ### A.2 — Rossmann spider
 

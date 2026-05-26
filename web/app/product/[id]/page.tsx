@@ -103,6 +103,8 @@ export default async function ProductPage({
   const finding = buildFindings(rows)[0] ?? null;
   const headline = finding ? headlineSentence(finding) : null;
   const productDisplayName = displayName(sample);
+  const isCrossVerified = finding?.cross_verified ?? false;
+  const crossVerifiedCountries = finding?.cross_verified_countries ?? [];
 
   const barData = rows.map((r) => ({
     country: r.country_code,
@@ -159,6 +161,15 @@ export default async function ProductPage({
               <span>
                 · EAN <span className="font-mono">{sample.ean}</span>
               </span>
+            )}
+            {isCrossVerified && (
+              <a
+                href="/about#external-ean-verification-open-beauty-facts"
+                title={`Same EAN-13 independently observed by two retailers in: ${crossVerifiedCountries.join(", ")}`}
+                className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-800"
+              >
+                ✓ cross-verified ({crossVerifiedCountries.join(", ")})
+              </a>
             )}
             {obfStatus && <ObfPill status={obfStatus} />}
           </div>

@@ -15,6 +15,8 @@ This is directly relevant to **European Commission policy on territorial supply 
 - **29 cross-EU products tracked** across drugstore essentials (22), baby essentials (3), and feminine hygiene (4). Every product has observations in **≥5 EU countries** (every product in the public set genuinely compares cross-EU); DACH-only products are excluded.
 - All 29 have verified EAN-13 codes, real product images, and canonical retailer URLs
 - **236 real cross-EU price observations** captured via Playwright scrapes of DM's 10 country sites — zero sample data, every row links to the actual retailer product page and stores the JSON-LD EAN that page exposed at scrape time
+- **2 retailers wired in**: DM Drogerie Markt (10 EU countries) + Müller (DE/AT/CH; HU/SI/CZ/IT seeded but disabled pending JS-rendering work). Switzerland adds a high-wage non-EU comparator.
+- **External identity verification**: every EAN reconciled against [Open Beauty Facts](https://world.openbeautyfacts.org/) (4 confirmed · 4 stubs · 21 not catalogued · **0 disagreements**); cross-retailer EAN agreement script (`scripts/audit_cross_retailer.py`) automatically verifies DM↔Müller wherever shared coverage exists.
 - **6 products with FULL 10-country coverage** (every DM country observed): Balea Deo Roll-On Sensitive, Ebelin Wattepads, Ebelin Wattestäbchen Recycling, dontodent PRO+ Zahnpasta, dontodent Zahnbürste Soft Protect, dontodent Mundspülung Total Power
 - Per-country coverage (of 29 products):
   DE 28 · SK 28 · AT 27 · SI 26 · CZ 24 · HR 24 · HU 23 · BG 21 · RO 21 · PL 14
