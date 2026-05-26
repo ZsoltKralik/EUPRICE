@@ -1,13 +1,30 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { listQuality, qualityRollup } from "@/lib/db";
+
 export const metadata: Metadata = {
   title: "Why this matters",
   description:
     "EUPRICE documents EU consumer price unfairness in drugstore essentials: how the strict EAN-and-retailer-SKU matching works, why minutes-of-median-wage is the headline metric, and what the EU policy hook is.",
 };
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const obfRollup = await qualityRollup("obf");
+  const obfRows = await listQuality("obf");
+  // Latest run timestamp for "as of" label
+  const lastRun = obfRows.length
+    ? obfRows.map((r) => r.run_at).sort().slice(-1)[0]
+    : null;
+  const lastRunDate = lastRun ? lastRun.slice(0, 10) : null;
+  // Up to 4 confirmed examples to show as evidence rows
+  const confirmed = obfRows
+    .filter(
+      (r) =>
+        r.severity === "info" && r.message.startsWith("OBF confirms"),
+    )
+    .slice(0, 4);
+
   return (
     <article className="prose-slate mx-auto max-w-3xl">
       <div className="mb-10">
@@ -94,6 +111,90 @@ export default function AboutPage() {
           See <code className="rounded bg-slate-100 px-1.5 py-0.5 text-sm">docs/METHODOLOGY.md</code>{" "}
           in the repository for the full rules, including the bidirectional unit-category
           check and the scraped-EAN audit trail.
+        </p>
+      </Section>
+
+      <Section title="External EAN verification (Open Beauty Facts)">
+        <p>
+          Today every identity claim in the dataset rests on the retailer&apos;s own
+          JSON-LD <code>gtin13</code>. To strengthen that with an independent witness,
+          every EAN is also checked against{" "}
+          <a
+            href="https://world.openbeautyfacts.org/"
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium text-indigo-700 hover:text-indigo-900"
+          >
+            Open Beauty Facts
+          </a>{" "}
+          — the community-maintained public EAN registry for personal-care products.
+          Results are recorded in the <code>data_quality_log</code> table and are
+          append-only: drift over time is itself a signal.
+        </p>
+        <div className="not-prose mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Stat
+            label="Confirmed"
+            value={obfRollup.confirmed}
+            of={obfRollup.total}
+            tone="positive"
+            hint="Brand + size agree with OBF"
+          />
+          <Stat
+            label="Stub"
+            value={obfRollup.stub}
+            of={obfRollup.total}
+            tone="neutral"
+            hint="EAN known to OBF, no metadata yet"
+          />
+          <Stat
+            label="Not in OBF"
+            value={obfRollup.miss}
+            of={obfRollup.total}
+            tone="neutral"
+            hint="Private-label SKUs uncatalogued"
+          />
+          <Stat
+            label="Disagreement"
+            value={obfRollup.warning}
+            of={obfRollup.total}
+            tone={obfRollup.warning ? "warning" : "positive"}
+            hint="Brand or size mismatch (warning)"
+          />
+        </div>
+        {lastRunDate && (
+          <p className="not-prose mt-3 text-xs text-slate-500">
+            Last verification run: {lastRunDate}. Source:{" "}
+            <code className="rounded bg-slate-100 px-1.5 py-0.5">
+              scripts/verify_eans_against_obf.py
+            </code>
+            .
+          </p>
+        )}
+        {confirmed.length > 0 && (
+          <div className="not-prose mt-4">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Examples confirmed by OBF
+            </div>
+            <ul className="mt-2 space-y-1.5 text-sm text-slate-700">
+              {confirmed.map((r) => (
+                <li
+                  key={r.id}
+                  className="flex flex-col gap-0.5 rounded-lg border border-emerald-100 bg-emerald-50/50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <span className="font-mono text-xs text-emerald-900">{r.ean}</span>
+                  <span className="text-xs text-slate-600">{r.message}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <p className="not-prose mt-3 text-sm text-slate-600">
+          Honest framing: OBF&apos;s coverage of private-label drugstore SKUs is thin —
+          Balea, Babylove, Dontodent, Ebelin SKUs are largely uncatalogued by the
+          community. The full external-verification answer is{" "}
+          <strong className="text-slate-900">a second retailer observing the same EAN</strong>{" "}
+          (Müller is next on the roadmap). The OBF check is one independent witness; the
+          cross-retailer check will be a second.
         </p>
       </Section>
 
@@ -303,6 +404,43 @@ function Source({ label, value }: { label: string; value: React.ReactNode }) {
         {label}
       </dt>
       <dd className="mt-1 text-sm leading-relaxed text-slate-700">{value}</dd>
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  of,
+  tone,
+  hint,
+}: {
+  label: string;
+  value: number;
+  of: number;
+  tone: "positive" | "warning" | "neutral";
+  hint: string;
+}) {
+  const toneClasses: Record<typeof tone, string> = {
+    positive: "border-emerald-200 bg-emerald-50",
+    warning: "border-amber-200 bg-amber-50",
+    neutral: "border-slate-200 bg-white",
+  };
+  const valueClasses: Record<typeof tone, string> = {
+    positive: "text-emerald-700",
+    warning: "text-amber-700",
+    neutral: "text-slate-900",
+  };
+  return (
+    <div className={`rounded-xl border ${toneClasses[tone]} p-3 shadow-soft`}>
+      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        {label}
+      </div>
+      <div className={`mt-1 text-2xl font-bold ${valueClasses[tone]}`}>
+        {value}
+        <span className="ml-1 text-sm font-medium text-slate-400">/ {of}</span>
+      </div>
+      <div className="mt-0.5 text-[11px] leading-snug text-slate-500">{hint}</div>
     </div>
   );
 }

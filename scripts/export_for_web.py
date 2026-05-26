@@ -69,6 +69,15 @@ def main() -> None:
         ORDER BY pr.product_id, pr.parsed_at ASC
     """), "history")
 
+    # External data-quality verification (Open Beauty Facts, etc.) — latest row
+    # per (source × product). Surfaced on the /about page as a transparency
+    # block: "of N EANs, X confirmed against OBF, Y not yet in OBF, Z stubs".
+    files["quality.json"] = dump(conn.execute("""
+        SELECT id, run_at, source, severity, ean, product_id, message, details_json
+        FROM v_data_quality_latest
+        ORDER BY source, product_id
+    """), "quality")
+
     total = 0
     for name, rows in files.items():
         path = OUT_DIR / name

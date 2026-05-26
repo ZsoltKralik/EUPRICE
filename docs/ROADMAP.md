@@ -22,8 +22,10 @@ Single retailer (DM), strict identity matching, audited dataset, fairness-focuse
 | "Cite this finding" block + social-share buttons | ✅ |
 | Universal + pairwise basket aggregates with apples-to-apples rigor | ✅ |
 | Mission-framed homepage with sortable unfairness ranking | ✅ |
+| External EAN reconciliation against Open Beauty Facts (Phase B.1) | ✅ |
+| `data_quality_log` table (migration 004) | ✅ |
 
-**Current data quality bar held since this phase:** zero EAN_DIFF / CATEGORY / MULTI / SIZE flags on every audit since the strict matcher landed.
+**Current data quality bar held since this phase:** zero EAN_DIFF / CATEGORY / MULTI / SIZE flags on every audit since the strict matcher landed. Every EAN that OBF has data for agrees with our DB (0 disagreements on 4 confirmed; remaining 25 are not catalogued by OBF — see /about).
 
 ---
 
@@ -58,12 +60,13 @@ Single retailer (DM), strict identity matching, audited dataset, fairness-focuse
 
 Today: every row is identity-verified by **the retailer's own claim**. Adding an external check turns "very confident" into "audit-proof."
 
-### B.1 — Open Beauty Facts EAN reconciliation
+### B.1 — Open Beauty Facts EAN reconciliation (✅ done)
 
-- OBF (Community Open Beauty Facts) has community-verified EAN→product mappings for most drugstore SKUs.
-- New `scripts/verify_eans_against_obf.py`: for every `product.ean` in our DB, query the OBF API; report mismatches.
-- Run weekly via cron; surface any discrepancies in a `data_quality_log` table.
-- A mismatch is a strong signal that either OBF or DM is wrong about that SKU's identity. Either case is research-worthy.
+- `scripts/verify_eans_against_obf.py` queries the OBF API for every `product.ean` in our DB; writes results to `data_quality_log` (migration 004).
+- Surface on `/about`: 4 confirmed (brand + size agree) · 4 stubs (EAN known, no metadata) · 21 not in OBF · **0 disagreements**.
+- Per-product OBF status pill on `/product/[id]` links to the methodology block.
+- Honest disclosure on the page: OBF's coverage of private-label drugstore SKUs (Balea / Babylove / Dontodent / Ebelin) is thin; the cross-retailer check (Phase A.1) is the broader verification path.
+- **Re-run schedule:** weekly cron (Phase C.2) will rerun and surface drift in `data_quality_log`.
 
 ### B.2 — GS1 GTIN verification (stretch goal)
 

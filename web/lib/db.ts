@@ -94,6 +94,22 @@ export type HistoryRow = {
   price_eur: number;
 };
 
+// One row per (source, product) — the latest verification result. Surfaces in
+// /about as a transparency block and on per-product pages when an external
+// source confirms (or contradicts) the EAN. Source is "obf" today; future
+// rows from "cross_retailer" (Müller agreement check) and "gs1" will use the
+// same shape.
+export type QualityRow = {
+  id: number;
+  run_at: string;
+  source: string;          // "obf" | "gs1" | "cross_retailer"
+  severity: string;        // "info" | "warning" | "error"
+  ean: string | null;
+  product_id: number | null;
+  message: string;
+  details_json: string | null;
+};
+
 // Lightweight mtime-keyed cache. In dev we always want to see fresh JSON when
 // the Python exporter rewrites web/data/*.json — caching by mtime means any
 // file change invalidates automatically without us restarting the dev server.
@@ -163,4 +179,35 @@ export async function eurostatPli(year?: number, categoryCode?: string): Promise
       (year === undefined || r.year === year) &&
       (categoryCode === undefined || r.category_code === categoryCode),
   );
+}
+
+export async function listQuality(source?: string): Promise<QualityRow[]> {
+  const all = await load<QualityRow>("quality.json");
+  return source ? all.filter((q) => q.source === source) : all;
+}
+
+export type QualityRollup = {
+  source: string;            // "obf"
+  total: number;             // products checked
+  confirmed: number;         // info severity AND message starts with "OBF confirms"
+  warning: number;           // severity = "warning"
+  stub: number;              // info but EAN known with no metadata
+  miss: number;              // info, EAN not in OBF
+};
+
+export async function qualityRollup(source: string = "obf"): Promise<QualityRollup> {
+  const rows = await listQuality(source);
+  let confirmed = 0, warning = 0, stub = 0, miss = 0;
+  for (const r of rows) {
+    if (r.severity === "warning") {
+      warning++;
+    } else if (r.message.startsWith("OBF confirms")) {
+      confirmed++;
+    } else if (r.message.includes("EAN known to OBF but no")) {
+      stub++;
+    } else {
+      miss++;
+    }
+  }
+  return { source, total: rows.length, confirmed, warning, stub, miss };
 }

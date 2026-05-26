@@ -1,10 +1,29 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { displayName, getProductLatest, priceHistory } from "@/lib/db";
+import {
+  displayName,
+  getProductLatest,
+  listQuality,
+  priceHistory,
+  type QualityRow,
+} from "@/lib/db";
 import { buildFindings, headlineSentence } from "@/lib/findings";
 import PriceBarChart from "@/components/PriceBarChart";
 import MinutesOfWorkChart from "@/components/MinutesOfWorkChart";
 import PriceHistoryChart from "@/components/PriceHistoryChart";
+
+function classifyObf(q: QualityRow | null):
+  | { kind: "confirmed"; message: string }
+  | { kind: "warning"; message: string }
+  | { kind: "stub" }
+  | { kind: "miss" }
+  | null {
+  if (!q) return null;
+  if (q.severity === "warning") return { kind: "warning", message: q.message };
+  if (q.message.startsWith("OBF confirms")) return { kind: "confirmed", message: q.message };
+  if (q.message.includes("EAN known to OBF but no")) return { kind: "stub" };
+  return { kind: "miss" };
+}
 
 export const dynamic = "force-dynamic";
 
@@ -58,10 +77,14 @@ export default async function ProductPage({
       </div>
     );
   }
-  const [rows, history] = await Promise.all([
+  const [rows, history, qualityRows] = await Promise.all([
     getProductLatest(productId),
     priceHistory(productId),
+    listQuality("obf"),
   ]);
+  const obfStatus = classifyObf(
+    qualityRows.find((q) => q.product_id === productId) ?? null,
+  );
 
   if (rows.length === 0) {
     return (
@@ -128,13 +151,16 @@ export default async function ProductPage({
               Local name: {sample.product_name}
             </div>
           )}
-          <div className="mt-2 text-sm text-slate-500">
-            {sample.size_value ?? "?"} {sample.size_unit ?? ""}
+          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-500">
+            <span>
+              {sample.size_value ?? "?"} {sample.size_unit ?? ""}
+            </span>
             {sample.ean && (
-              <>
-                {" · "}EAN <span className="font-mono">{sample.ean}</span>
-              </>
+              <span>
+                · EAN <span className="font-mono">{sample.ean}</span>
+              </span>
             )}
+            {obfStatus && <ObfPill status={obfStatus} />}
           </div>
           {sample.product_canonical_url && (
             <a
@@ -401,6 +427,44 @@ function ShareLink({ href, label }: { href: string; label: string }) {
       className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
     >
       {label} ↗
+    </a>
+  );
+}
+
+function ObfPill({
+  status,
+}: {
+  status:
+    | { kind: "confirmed"; message: string }
+    | { kind: "warning"; message: string }
+    | { kind: "stub" }
+    | { kind: "miss" };
+}) {
+  const classes: Record<typeof status.kind, string> = {
+    confirmed: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    warning: "border-amber-300 bg-amber-50 text-amber-800",
+    stub: "border-slate-200 bg-slate-50 text-slate-600",
+    miss: "border-slate-200 bg-slate-50 text-slate-500",
+  };
+  const labels: Record<typeof status.kind, string> = {
+    confirmed: "OBF confirmed",
+    warning: "OBF disagreement",
+    stub: "OBF stub (no metadata)",
+    miss: "Not in OBF",
+  };
+  const title =
+    status.kind === "confirmed" || status.kind === "warning"
+      ? status.message
+      : status.kind === "stub"
+        ? "EAN is known to Open Beauty Facts but has no brand/name metadata."
+        : "EAN is not in Open Beauty Facts. Most DM private-label SKUs are not yet catalogued.";
+  return (
+    <a
+      href="/about#external-ean-verification-open-beauty-facts"
+      title={title}
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${classes[status.kind]}`}
+    >
+      {labels[status.kind]}
     </a>
   );
 }

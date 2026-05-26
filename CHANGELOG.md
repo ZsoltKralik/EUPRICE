@@ -6,6 +6,17 @@ The project follows a loose pattern: features are commits; methodology promises 
 
 ---
 
+## 2026-05 — External EAN verification via Open Beauty Facts
+
+The first external identity check on the dataset. Until now every identity claim rested on a single source — DM's own JSON-LD `gtin13`. This adds an independent second witness for the EANs that OBF carries.
+
+- New `scripts/verify_eans_against_obf.py` queries the OBF API for every `product.ean` in the DB.
+- New `data_quality_log` table (migration 004) records every check as an append-only row; latest-per-source view in `v_data_quality_latest`.
+- Per-EAN classification: **confirmed** (OBF brand + size agree with our DB), **stub** (EAN known to OBF but no metadata), **miss** (EAN not in OBF), **warning** (disagreement on brand or size).
+- Honest result of the first run on the 29-product catalogue: **4 confirmed · 4 stubs · 21 not in OBF · 0 disagreements.** OBF's coverage of private-label drugstore SKUs (Balea, Babylove, Dontodent, Ebelin) is thin; the cross-retailer check (Müller, Phase A.1) is the broader verification path.
+- `/about` page surfaces the rollup with confirmed examples; `/product/[id]` shows a per-product OBF status pill next to the EAN.
+- Why "0 disagreements" is the headline: every EAN OBF *does* have data for matches our DB on brand and size. Where OBF agrees, we agree. Where OBF doesn't carry the SKU at all, the dataset remains methodologically open until a second retailer confirms it.
+
 ## 2026-05 — Basket aggregate (universal + pairwise)
 
 - New `/basket` page surfaces the cumulative version of the fairness question: how much of a working day does a representative bundle of identity-verified daily essentials cost in each country?
