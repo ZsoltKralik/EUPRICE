@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { listLatest, listProducts, type LatestPriceRow, type ProductLite } from "@/lib/db";
+import { listLatest, type LatestPriceRow } from "@/lib/db";
 import {
   buildFindings,
   buildUniversalBasket,
@@ -25,10 +25,9 @@ export default async function Home({
   const sp = await searchParams;
   const verifiedOnly = sp.verified === "1";
   let rows: LatestPriceRow[] = [];
-  let allProducts: ProductLite[] = [];
   let dbError: string | null = null;
   try {
-    [rows, allProducts] = await Promise.all([listLatest(), listProducts()]);
+    rows = await listLatest();
   } catch (e) {
     dbError = e instanceof Error ? e.message : String(e);
   }
@@ -92,7 +91,7 @@ export default async function Home({
 
         {/* quick stats */}
         <div className="mt-8 grid grid-cols-2 gap-3 max-w-2xl sm:grid-cols-4">
-          <Stat value={allProducts.length} label="cross-EU products" />
+          <Stat value={findings.length} label="cross-EU products" />
           <Stat value={totalCountries} label="countries" />
           <Stat value={totalShops} label={totalShops > 1 ? "retailers" : "retailer"} />
           <Stat value={rows.length} label="verified observations" />

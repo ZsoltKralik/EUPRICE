@@ -112,17 +112,18 @@ def _eans_from_jsonld_images(images, markant_id: Optional[str] = None) -> set[st
     filenames — and ~10 % of random Markant ids happen to also pass the
     EAN-13 check-digit algorithm.
 
-    Two filters together kill those false positives:
+    Filters that together kill the false positives:
 
       1. **Check-digit validity** (GS1 algorithm) — required for any EAN-13.
-      2. **No 4+ leading zeros** — real EAN-13s identify a country/manufacturer
-         prefix; the only way to get 4+ leading zeros is to be a short SKU id
-         zero-padded into the field. EU drugstore-product EANs start with
-         `40`–`97` (40-44 = Germany/Austria, 87 = NL, 50 = UK, etc.) — never
-         with `0000…`.
+      2. **Explicit Markant-id exclusion** — when the JSON-LD exposes
+         a `gtin` field (the Markant article id, ~8 digits), reject any
+         candidate equal to it zero-padded to 13 or 8. This is the primary
+         disambiguator between real EAN-13s and Markant-id false-positives.
 
-    If `markant_id` is passed (from the JSON-LD `gtin` field), we also exclude
-    any candidate equal to that id zero-padded — a belt-and-braces guard.
+    Note: we previously rejected all candidates with 4+ leading zeros, but
+    that breaks for products with GTIN-8 EANs (e.g. small-package
+    deodorant SKUs where Nivea = 42495277 → EAN-13 form 0000042495277).
+    The Markant-id exclusion above does the disambiguation more precisely.
     """
     out: set[str] = set()
     if not images:
@@ -144,11 +145,15 @@ def _eans_from_jsonld_images(images, markant_id: Optional[str] = None) -> set[st
             candidate = m.group(1)
             if not _is_valid_ean13(candidate):
                 continue
-            if candidate.startswith("0000"):
-                continue  # zero-padded short id, not a retail EAN-13
             if markant_padded and candidate == markant_padded:
                 continue
-            out.add(candidate)
+            # Strip leading zeros to canonical form — matches DM's JSON-LD
+            # which exposes the bare GTIN-8 / GTIN-12 / GTIN-13 without
+            # zero-padding. So a Müller image filename containing
+            # `_0000042495277_` becomes the EAN string "42495277", which
+            # equals what DM's JSON-LD gtin field carries.
+            canonical = candidate.lstrip("0") or "0"
+            out.add(canonical)
     return out
 
 

@@ -49,7 +49,7 @@ export default async function ComparePage() {
 
       {board.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500 shadow-soft">
-          No products with prices in 2+ countries yet.
+          No products with prices in 4+ countries yet.
         </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">

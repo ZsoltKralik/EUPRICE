@@ -6,6 +6,16 @@ The project follows a loose pattern: features are commits; methodology promises 
 
 ---
 
+## 2026-05 — ≥4-country comparison floor + household category
+
+Sharpened what counts as a publishable comparison and grew the catalog with everyday household essentials.
+
+- **≥4 distinct-country floor.** `web/lib/findings.ts` now requires a product to be observed in at least **4 distinct countries** (counting countries, not rows) before it appears in any ranking, the homepage grid, or the compare leaderboard. A product DM only stocks in Germany + Austria (e.g. the Oral-B Pro-Expert toothpaste) is no longer presented as a cross-EU comparison — two-country spreads aren't an EU-fairness story. Below-floor products still render at their own `/product/[id]` URL with an honest amber "limited coverage — not a cross-EU finding" notice.
+- **40-SKU catalog, 33 in comparisons.** The 7 branded SKUs DM only sells in DACH stay in the catalog (they're the substrate for cross-retailer verification once Müller branded coverage lands) but are excluded from the rankings.
+- **New `household` category** — added DM private-label cleaning products: Denkmit Spülmittel Ultra Pro Climate (dish soap) and Denkmit Allzweckreiniger Frühlingsmoment (all-purpose cleaner, 1 l), both reaching 8 countries. Also added Balea Trockenshampoo and alverde Reinigungsmilch. Comparison set grew 29 → 33; observations 236 → 283.
+- **OBF re-run on 40 EANs: 8 confirmed · 4 stub · 28 miss · 0 disagreements.** Fixed a false-positive in `scripts/verify_eans_against_obf.py`: a crowd-sourced OBF `quantity` of "1pcs"/"1 piece" on a product the DB knows is sold by volume/weight is an *uninformative placeholder*, not a genuine size disagreement, and is now logged as `info` when brand + name already confirm the SKU. (This is what flipped Balea Cremedusche Sensitive from warning to confirmed — OBF agreed on brand=Balea, name="Sensitive Cremedusche"; only its quantity field was the placeholder.) The "0 disagreements" claim is preserved on its merits, not by suppressing a real conflict.
+- Pack-quality audit: **0 fatal flags** (no EAN / category / multipack / size violations) across all 283 rows.
+
 ## 2026-05 — Müller, second pan-EU drugstore (Phase A.1)
 
 The second pan-EU drugstore is now wired in. The strict-matcher rigor previously implemented for DM extends naturally to Müller (DE / AT / CH; HU / SI / CZ / IT seeded but disabled pending JS-rendering work for bot-defended pages).

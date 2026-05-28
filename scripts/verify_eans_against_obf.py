@@ -181,7 +181,15 @@ def compare(product_row: dict, obf: dict) -> tuple[str, str, dict]:
     if db_canon and obf_canon:
         details["db_canonical"] = f"{db_canon[0]:g} {db_canon[1]}"
         details["obf_canonical"] = f"{obf_canon[0]:g} {obf_canon[1]}"
-        if db_canon[1] != obf_canon[1]:
+        # OBF placeholder guard: a "1pcs"/"1 piece"/"1 unit" quantity on a product
+        # that DB knows is sold by volume or weight is an uninformative default in
+        # the OBF record, NOT a genuine size disagreement. Crowd-sourced OBF entries
+        # frequently leave the quantity field at this placeholder. Treat it as
+        # informational rather than a warning when brand+name already agree.
+        obf_is_placeholder = obf_canon == (1.0, "piece") and db_canon[1] in ("ml", "g")
+        if obf_is_placeholder:
+            details["obf_quantity_placeholder"] = True
+        elif db_canon[1] != obf_canon[1]:
             problems.append(
                 f"OBF unit category {obf_canon[1]} differs from DB {db_canon[1]}"
             )

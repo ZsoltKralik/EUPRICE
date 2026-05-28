@@ -54,9 +54,22 @@ export type Finding = {
 };
 
 /**
+ * Minimum number of distinct countries a product must be observed in before it
+ * appears as a fairness comparison. A two- or three-country spread is too thin
+ * to make a credible cross-EU claim (e.g. a DACH-only branded SKU that DM only
+ * carries in DE + AT tells us nothing about lower-wage member states). Four is
+ * the floor: enough geographic spread that the wage-time gap reflects a genuine
+ * cross-EU pattern rather than a single neighbouring-country quirk.
+ *
+ * Products below the floor stay in the database (they still matter for
+ * cross-retailer EAN verification) but are excluded from the comparison grids.
+ */
+export const MIN_COMPARISON_COUNTRIES = 4;
+
+/**
  * Compute one Finding per product from the flat latest-prices list.
- * Returns only products with ≥ 2 country observations (others can't be
- * meaningfully ranked against themselves).
+ * Returns only products observed in at least MIN_COMPARISON_COUNTRIES distinct
+ * countries — fewer than that can't support a credible cross-EU comparison.
  */
 export function buildFindings(rows: LatestPriceRow[]): Finding[] {
   const byProduct = new Map<number, LatestPriceRow[]>();
@@ -67,7 +80,10 @@ export function buildFindings(rows: LatestPriceRow[]): Finding[] {
 
   const out: Finding[] = [];
   for (const [pid, group] of byProduct) {
-    if (group.length < 2) continue;
+    // Count DISTINCT countries, not rows: a cross-verified product can have two
+    // rows in one country (one per retailer), which must not inflate coverage.
+    const distinctCountries = new Set(group.map((r) => r.country_code)).size;
+    if (distinctCountries < MIN_COMPARISON_COUNTRIES) continue;
 
     const sample = group[0];
     const cheapestEurRow = group.reduce((a, b) => (a.price_eur <= b.price_eur ? a : b));
@@ -134,7 +150,7 @@ export function buildFindings(rows: LatestPriceRow[]): Finding[] {
       size_value: sample.size_value,
       size_unit: sample.size_unit,
       ean: sample.ean,
-      countries_observed: group.length,
+      countries_observed: distinctCountries,
       shops,
       cross_verified: cross_countries.size > 0,
       cross_verified_countries: Array.from(cross_countries).sort(),

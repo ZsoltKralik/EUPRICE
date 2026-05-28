@@ -7,7 +7,7 @@ import {
   priceHistory,
   type QualityRow,
 } from "@/lib/db";
-import { buildFindings, headlineSentence } from "@/lib/findings";
+import { buildFindings, headlineSentence, MIN_COMPARISON_COUNTRIES } from "@/lib/findings";
 import PriceBarChart from "@/components/PriceBarChart";
 import MinutesOfWorkChart from "@/components/MinutesOfWorkChart";
 import PriceHistoryChart from "@/components/PriceHistoryChart";
@@ -102,6 +102,8 @@ export default async function ProductPage({
   const spreadPct = ((maxRow.price_eur - minRow.price_eur) / minRow.price_eur) * 100;
   const finding = buildFindings(rows)[0] ?? null;
   const headline = finding ? headlineSentence(finding) : null;
+  const distinctCountries = new Set(rows.map((r) => r.country_code)).size;
+  const belowFloor = distinctCountries < MIN_COMPARISON_COUNTRIES;
   const productDisplayName = displayName(sample);
   const isCrossVerified = finding?.cross_verified ?? false;
   const crossVerifiedCountries = finding?.cross_verified_countries ?? [];
@@ -185,6 +187,28 @@ export default async function ProductPage({
           )}
         </div>
       </header>
+
+      {/* limited-coverage notice — below the cross-EU comparison floor */}
+      {belowFloor && (
+        <section className="mb-10 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900 shadow-soft">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-amber-700">
+            Limited coverage — not a cross-EU finding
+          </div>
+          <p className="mt-2 leading-relaxed">
+            This SKU is currently observed in only{" "}
+            <strong>{distinctCountries} {distinctCountries === 1 ? "country" : "countries"}</strong>,
+            below our {MIN_COMPARISON_COUNTRIES}-country floor for a credible cross-EU comparison, so
+            it is <strong>excluded from the rankings</strong>. The retailer stocks it online only in
+            a small set of (typically German-speaking) markets. The rows below are real and
+            identity-verified — we keep them for cross-retailer EAN verification — but a two- or
+            three-country spread is a cross-DACH observation, not a cross-EU one.{" "}
+            <Link href="/about" className="font-medium text-amber-900 underline hover:text-amber-700">
+              Why the threshold exists
+            </Link>
+            .
+          </p>
+        </section>
+      )}
 
       {/* headline finding — the unfairness statement, prominent */}
       {finding && finding.cheapest_minutes && finding.dearest_minutes && finding.minutes_ratio && (

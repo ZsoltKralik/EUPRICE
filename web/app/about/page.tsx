@@ -113,9 +113,9 @@ export default async function AboutPage() {
           </li>
           <li>
             <strong className="text-slate-900">Minimum coverage threshold.</strong> Every
-            product on the site has observations in at least 5 EU countries — a Germany +
-            Austria pair isn&apos;t a cross-EU finding, it&apos;s a cross-DACH
-            observation, so those are excluded.
+            product shown as a comparison has observations in at least 4 EU countries — a
+            Germany&nbsp;+&nbsp;Austria pair isn&apos;t a cross-EU finding, it&apos;s a
+            cross-DACH observation, so those are excluded from the rankings.
           </li>
         </ul>
         <p>
