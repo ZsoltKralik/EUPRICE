@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { listLatest, listProducts, type LatestPriceRow, type ProductLite } from "@/lib/db";
 import MapClient from "./MapClient";
+import { comparisonRows } from "@/lib/findings";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,6 @@ export default async function MapPage({
   }
   const initialProductId = sp.product ? Number(sp.product) : products[0]?.id ?? 0;
   return (
-    <MapClient products={products} prices={prices} initialProductId={initialProductId} />
+    <MapClient products={products} prices={comparisonRows(prices)} initialProductId={initialProductId} />
   );
 }

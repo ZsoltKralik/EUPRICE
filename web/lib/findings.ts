@@ -67,15 +67,78 @@ export type Finding = {
 export const MIN_COMPARISON_COUNTRIES = 4;
 
 /**
+ * Non-EU comparator countries. Switzerland is tracked deliberately (a
+ * high-wage non-EU benchmark that shows the wage-time gap is a wage
+ * phenomenon, not an EU artefact) — its rows render on product pages, but it
+ * must never enter a "cross-EU" ranking, basket, country count, or headline.
+ */
+export const NON_EU_COUNTRIES = new Set(["CH"]);
+
+/**
+ * Restrict rows to the cross-EU comparison universe:
+ *
+ *  1. EU member states only — non-EU comparators (CH) are display-only.
+ *  2. One retailer per product: the retailer observing that product in the
+ *     most distinct countries (DM today, with its 10-country network).
+ *     Rows from additional retailers exist to corroborate identity
+ *     (cross-retailer EAN verification) — letting them supply min/max prices
+ *     would break the "same retailer" claim, and summing them would
+ *     double-count countries in basket totals.
+ *
+ * Ties on country coverage resolve alphabetically for determinism.
+ */
+export function comparisonRows(rows: LatestPriceRow[]): LatestPriceRow[] {
+  const euRows = rows.filter((r) => !NON_EU_COUNTRIES.has(r.country_code));
+  const byProduct = new Map<number, LatestPriceRow[]>();
+  for (const r of euRows) {
+    if (!byProduct.has(r.product_id)) byProduct.set(r.product_id, []);
+    byProduct.get(r.product_id)!.push(r);
+  }
+  const out: LatestPriceRow[] = [];
+  for (const group of byProduct.values()) {
+    const countriesByShop = new Map<string, Set<string>>();
+    for (const r of group) {
+      if (!countriesByShop.has(r.shop_code)) countriesByShop.set(r.shop_code, new Set());
+      countriesByShop.get(r.shop_code)!.add(r.country_code);
+    }
+    let comparisonShop: string | null = null;
+    for (const [shop, countries] of countriesByShop) {
+      if (comparisonShop === null) {
+        comparisonShop = shop;
+        continue;
+      }
+      const best = countriesByShop.get(comparisonShop)!;
+      if (
+        countries.size > best.size ||
+        (countries.size === best.size && shop < comparisonShop)
+      ) {
+        comparisonShop = shop;
+      }
+    }
+    out.push(...group.filter((r) => r.shop_code === comparisonShop));
+  }
+  return out;
+}
+
+/**
  * Compute one Finding per product from the flat latest-prices list.
  * Returns only products observed in at least MIN_COMPARISON_COUNTRIES distinct
  * countries — fewer than that can't support a credible cross-EU comparison.
  */
 export function buildFindings(rows: LatestPriceRow[]): Finding[] {
+  // Comparison stats (min/max, spreads, country counts) come from the EU-only,
+  // single-retailer universe; the full row set is kept per product for the
+  // cross-retailer corroboration roll-up.
+  const compRows = comparisonRows(rows);
   const byProduct = new Map<number, LatestPriceRow[]>();
-  for (const r of rows) {
+  for (const r of compRows) {
     if (!byProduct.has(r.product_id)) byProduct.set(r.product_id, []);
     byProduct.get(r.product_id)!.push(r);
+  }
+  const allByProduct = new Map<number, LatestPriceRow[]>();
+  for (const r of rows) {
+    if (!allByProduct.has(r.product_id)) allByProduct.set(r.product_id, []);
+    allByProduct.get(r.product_id)!.push(r);
   }
 
   const out: Finding[] = [];
@@ -84,6 +147,7 @@ export function buildFindings(rows: LatestPriceRow[]): Finding[] {
     // rows in one country (one per retailer), which must not inflate coverage.
     const distinctCountries = new Set(group.map((r) => r.country_code)).size;
     if (distinctCountries < MIN_COMPARISON_COUNTRIES) continue;
+    const fullGroup = allByProduct.get(pid) ?? group;
 
     const sample = group[0];
     const cheapestEurRow = group.reduce((a, b) => (a.price_eur <= b.price_eur ? a : b));
@@ -124,12 +188,14 @@ export function buildFindings(rows: LatestPriceRow[]): Finding[] {
     // single country has observations from two or more retailers, AND those
     // retailers report identical EANs. We trust v_latest_prices.ean (the
     // product-table canonical) as the comparison key — same logic as
-    // scripts/audit_cross_retailer.py.
-    const shops = Array.from(new Set(group.map((r) => r.shop_code))).sort();
+    // scripts/audit_cross_retailer.py. Uses the FULL row set (all retailers,
+    // incl. non-EU comparators) — corroboration is welcome from anywhere even
+    // though comparison stats never use those rows.
+    const shops = Array.from(new Set(fullGroup.map((r) => r.shop_code))).sort();
     const cross_countries = new Set<string>();
     if (shops.length >= 2) {
       const byCountry = new Map<string, LatestPriceRow[]>();
-      for (const r of group) {
+      for (const r of fullGroup) {
         if (!byCountry.has(r.country_code)) byCountry.set(r.country_code, []);
         byCountry.get(r.country_code)!.push(r);
       }
@@ -270,6 +336,10 @@ export function buildUniversalBasket(
   rows: LatestPriceRow[],
   version = "v1",
 ): Basket | null {
+  // EU-only, one retailer per product — otherwise a second retailer's row in
+  // the same country double-counts that product in the country total, and a
+  // non-EU comparator (CH) would shrink the "every country" intersection.
+  rows = comparisonRows(rows);
   const allCountries = new Set(rows.map((r) => r.country_code));
   if (allCountries.size === 0) return null;
   const productCountrySets = new Map<number, Set<string>>();
@@ -302,6 +372,7 @@ export function buildPairwiseBasket(
   countryB: string,
 ): Basket | null {
   if (countryA === countryB) return null;
+  rows = comparisonRows(rows);
   const inA = new Set<number>();
   const inB = new Set<number>();
   for (const r of rows) {

@@ -78,6 +78,20 @@ def main() -> None:
         ORDER BY source, product_id
     """), "quality")
 
+    # Independent evidence snapshots (Internet Archive) — newest ok snapshot
+    # per URL. Product pages link these as third-party dated proof that the
+    # retailer page showed this content on the snapshot date.
+    files["evidence.json"] = dump(conn.execute("""
+        SELECT url, archive_url, snapshot_ts, requested_at
+        FROM evidence_archive e
+        WHERE status = 'ok'
+          AND snapshot_ts = (
+            SELECT MAX(snapshot_ts) FROM evidence_archive
+            WHERE url = e.url AND status = 'ok'
+          )
+        ORDER BY url
+    """), "evidence")
+
     total = 0
     for name, rows in files.items():
         path = OUT_DIR / name

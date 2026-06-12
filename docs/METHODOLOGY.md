@@ -17,8 +17,10 @@ The site is built to support a policy claim — *"EU consumers in lower-wage cou
 3. **Same retailer-internal SKU id.** When EAN-13 codes diverge between countries (regionally re-labeled SKUs), we accept a row only when the retailer's own internal id matches (`/p/d/<NNNN>/` on DM, `/p/<slug>-<NNNN>/` on Müller).
 4. **Pack-guard validation.** Multi-pack markers, unit-category mismatches (200 ml seed vs 100 g scrape), and size deviations greater than ±15 % are rejected automatically. Catches the wrong-product-line failures common to text-search matchers. On Müller, the pack size is harvested from the rendered HTML (`Inhalt: <span>NN unit</span>`) since the JSON-LD `name` omits it, and the spider walks sibling-variant `?itemId=NNN` links to find the seed size when the default landing page is a different size.
 5. **External identity verification.** Every EAN is checked against [Open Beauty Facts](https://world.openbeautyfacts.org/) and (where catalogs overlap) against an independent second retailer. Results are written to `data_quality_log` (append-only) and surfaced on `/about`.
-6. **Minimum coverage threshold.** Every product shown as a comparison has observations in at least **4 distinct countries**. Two or three German-speaking neighbours aren't a cross-EU finding — they're a cross-DACH observation — so products that resolve only in DE/AT (e.g. branded SKUs DM stocks online only in its home markets) are excluded from the rankings, even though their rows stay in the database for cross-retailer EAN verification. The threshold counts *distinct countries*, not rows, so a product observed at two retailers in the same country is not double-counted.
-7. **Append-only history with reproducible snapshots.** Every scraped HTML page is archived locally with a SHA-256 fingerprint on the row, so any specific finding can be re-verified against the exact bytes that were parsed.
+6. **Minimum coverage threshold.** Every product shown as a comparison has observations in at least **4 distinct EU countries**. Two or three German-speaking neighbours aren't a cross-EU finding — they're a cross-DACH observation — so products that resolve only in DE/AT (e.g. branded SKUs DM stocks online only in its home markets) are excluded from the rankings, even though their rows stay in the database for cross-retailer EAN verification. The threshold counts *distinct countries*, not rows, so a product observed at two retailers in the same country is not double-counted.
+7. **A defined comparison universe.** Rankings, baskets and headline numbers are computed from EU rows of **one retailer per product** — the retailer observing that product in the most countries (DM, with its 10-country network). Rows from additional retailers (Müller) corroborate identity but never supply min/max prices: mixing retailers would break the "same retailer" claim and double-count countries in basket totals. Switzerland is tracked deliberately as a high-wage **non-EU comparator**: its rows render on product pages but never enter a cross-EU ranking, basket, or country count (`NON_EU_COUNTRIES` in `web/lib/findings.ts`).
+8. **Append-only history with reproducible snapshots.** Every scraped HTML page is archived locally with a SHA-256 fingerprint on the row, so any specific finding can be re-verified against the exact bytes that were parsed.
+9. **Independent third-party evidence.** Observed product URLs are submitted to the [Internet Archive's Wayback Machine](https://web.archive.org/) (`scripts/archive_evidence.py`, results in `evidence_archive`). A snapshot documents the page **on the snapshot date** — which can differ from a row's parse date — and the UI labels the two dates separately. The local SHA-256 archive is the parse-time evidence; the Wayback snapshot is dated proof held by a party we cannot edit.
 
 If any of these break — e.g. a future spider regression silently re-introduces wrong-product matches — `scripts/audit_pack_quality.py` (5-class fatal-flag audit) plus `scripts/audit_cross_retailer.py` (DM↔Müller EAN agreement in shared countries) will surface it on the next audit run.
 
@@ -60,8 +62,12 @@ Retailers are chosen because they (a) operate cross-border with comparable catal
 
 | Dataset | Use | Update cycle |
 |---|---|---|
-| [`earn_ses_hourly`](https://ec.europa.eu/eurostat/databrowser/view/earn_ses_hourly/) (Structure of Earnings Survey, hourly earnings) | Country median hourly wage, used in the minutes-of-work metric | Every 4 years (latest 2022) |
+| [`earn_ses_pub2s`](https://ec.europa.eu/eurostat/databrowser/view/earn_ses_pub2s/default/table) (SES — median gross hourly earnings, all employees excl. apprentices, unit=EUR) | Country median hourly wage, used in the minutes-of-work metric. **Exact values** (e.g. DE 19.39 · AT 17.65 · SI 10.47 · CZ 8.23 · HR 6.82 · HU 5.73 · PL 6.90 · SK 7.72 · RO 5.55 · BG 4.05 · CH 37.64), retrieved via the Eurostat dissemination API on 2026-06-12 (dataset updated 2026-02-09). | Every 4 years (latest wave 2022) |
 | [`prc_ppp_ind`](https://ec.europa.eu/eurostat/databrowser/view/prc_ppp_ind/) (Price Level Indices) | Triangulation: do our scraped spreads agree with Eurostat's published indices? | Annual |
+
+**Wage vintage and direction of bias.** SES is quadrennial; 2022 is the latest wave. Nominal wages in CEE have grown faster than in DACH since 2022, so pairing 2022 wage denominators with current prices slightly **overstates** today's minutes-of-work in low-wage countries (and the cross-country ratios). The qualitative conclusion is unaffected; the bias and its direction are disclosed here and in the report.
+
+**VAT rates** are the national standard rates legally in force on the scrape dates, including Slovakia 23 % (from 2025-01-01) and Romania 21 % (Law no. 141/2025, from 2025-08-01). All current price rows postdate these changes. Bulgaria has priced in euro since 2026-01-01 (fixed conversion 1.95583 BGN/€); Bulgarian rows are observed directly in EUR.
 
 Eurostat data is pulled via the public [Eurostat JSON-stat API](https://wikis.ec.europa.eu/display/EUROSTATHELP/API+-+Getting+started) in `scraper/core/eurostat.py` and stored in the `eurostat_pli` and `country` tables.
 
@@ -184,7 +190,7 @@ The first is the consumer-facing fact. The second isolates the policy-relevant p
 
 ## 6. The minutes-of-work metric
 
-> *A €3 micellar water in Vienna (median wage ~€20/h) costs ~9 minutes of work. The same product at €3.40 in Bratislava (median wage ~€9/h) costs ~23 minutes — 2.5× the labor for nearly the same nominal price.*
+> *A €3 micellar water in Vienna (median wage €17.65/h) costs ~10 minutes of work. The same product at €3.40 in Bratislava (median wage €7.72/h) costs ~26 minutes — 2.6× the labor for nearly the same nominal price.*
 
 This is the headline metric of EUPRICE and the case study's central finding. The arithmetic is trivial; the analytical move is choosing to express price in labor time rather than nominal EUR.
 
@@ -275,7 +281,7 @@ When citing EUPRICE findings in published work, please include:
 
 Sample citation:
 
-> Bratislava (SK) shelf price of €3.39 for Balea Mizellenwasser 3in1 Rose 400 ml (EAN 4066447365962), scraped from mojadm.sk on 2026-05-13. Source: EUPRICE (`price_id=42`, `raw_html_sha256=…`). Slovak median hourly wage of €9.00 from Eurostat `earn_ses_hourly` (2022 release).
+> Bratislava (SK) shelf price of €3.39 for Balea Mizellenwasser 3in1 Rose 400 ml (EAN 4066447365962), scraped from mojadm.sk on 2026-05-13. Source: EUPRICE (`price_id=42`, `raw_html_sha256=…`). Slovak median hourly wage of €7.72 from Eurostat `earn_ses_pub2s` (SES 2022, retrieved 2026-06-12).
 
 ## 11. Open issues
 

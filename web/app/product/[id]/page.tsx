@@ -2,12 +2,19 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   displayName,
+  evidenceByUrl,
   getProductLatest,
   listQuality,
   priceHistory,
+  snapshotDate,
   type QualityRow,
 } from "@/lib/db";
-import { buildFindings, headlineSentence, MIN_COMPARISON_COUNTRIES } from "@/lib/findings";
+import {
+  buildFindings,
+  headlineSentence,
+  MIN_COMPARISON_COUNTRIES,
+  NON_EU_COUNTRIES,
+} from "@/lib/findings";
 import PriceBarChart from "@/components/PriceBarChart";
 import MinutesOfWorkChart from "@/components/MinutesOfWorkChart";
 import PriceHistoryChart from "@/components/PriceHistoryChart";
@@ -77,10 +84,11 @@ export default async function ProductPage({
       </div>
     );
   }
-  const [rows, history, qualityRows] = await Promise.all([
+  const [rows, history, qualityRows, evidence] = await Promise.all([
     getProductLatest(productId),
     priceHistory(productId),
     listQuality("obf"),
+    evidenceByUrl(),
   ]);
   const obfStatus = classifyObf(
     qualityRows.find((q) => q.product_id === productId) ?? null,
@@ -102,7 +110,9 @@ export default async function ProductPage({
   const spreadPct = ((maxRow.price_eur - minRow.price_eur) / minRow.price_eur) * 100;
   const finding = buildFindings(rows)[0] ?? null;
   const headline = finding ? headlineSentence(finding) : null;
-  const distinctCountries = new Set(rows.map((r) => r.country_code)).size;
+  const distinctCountries = new Set(
+    rows.filter((r) => !NON_EU_COUNTRIES.has(r.country_code)).map((r) => r.country_code),
+  ).size;
   const belowFloor = distinctCountries < MIN_COMPARISON_COUNTRIES;
   const productDisplayName = displayName(sample);
   const isCrossVerified = finding?.cross_verified ?? false;
@@ -196,7 +206,7 @@ export default async function ProductPage({
           </div>
           <p className="mt-2 leading-relaxed">
             This SKU is currently observed in only{" "}
-            <strong>{distinctCountries} {distinctCountries === 1 ? "country" : "countries"}</strong>,
+            <strong>{distinctCountries} EU {distinctCountries === 1 ? "country" : "countries"}</strong>,
             below our {MIN_COMPARISON_COUNTRIES}-country floor for a credible cross-EU comparison, so
             it is <strong>excluded from the rankings</strong>. The retailer stocks it online only in
             a small set of (typically German-speaking) markets. The rows below are real and
@@ -310,6 +320,7 @@ export default async function ProductPage({
               <th className="px-4 py-3">Promo</th>
               <th className="px-4 py-3">Updated</th>
               <th className="px-4 py-3">Link</th>
+              <th className="px-4 py-3">Archived</th>
             </tr>
           </thead>
           <tbody>
@@ -363,10 +374,43 @@ export default async function ProductPage({
                     {r.is_sample ? "search ↗" : "open ↗"}
                   </a>
                 </td>
+                <td className="px-4 py-3">
+                  {evidence.get(r.url) ? (
+                    <a
+                      className="text-xs font-medium text-emerald-700 hover:text-emerald-900"
+                      href={evidence.get(r.url)!.archive_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Independent Wayback Machine snapshot of this page. Documents the page on the snapshot date."
+                    >
+                      {snapshotDate(evidence.get(r.url)!.snapshot_ts)} ↗
+                    </a>
+                  ) : (
+                    <span className="text-xs text-slate-400" title="No Internet Archive snapshot yet — queued for the next archive wave.">
+                      —
+                    </span>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
+        <div className="border-t border-slate-100 px-6 py-3 text-xs leading-relaxed text-slate-500">
+          <strong className="text-slate-600">Evidence trail.</strong> Every row was parsed from
+          the linked retailer page; the exact HTML we parsed is archived locally with a SHA-256
+          fingerprint recorded at scrape time (&quot;Updated&quot; date). The{" "}
+          <span className="text-emerald-700">Archived</span> column links an independent{" "}
+          <a
+            href="https://web.archive.org/"
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium text-indigo-700 hover:text-indigo-900"
+          >
+            Internet Archive
+          </a>{" "}
+          snapshot of the same page — third-party, dated proof of what the retailer displayed on
+          the snapshot date, outside our control.
+        </div>
       </section>
 
       {/* Cite + Share */}

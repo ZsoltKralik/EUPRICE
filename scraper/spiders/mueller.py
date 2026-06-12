@@ -169,7 +169,7 @@ class MuellerSpider(Spider):
             """Fetch a candidate URL, apply strict acceptance, optionally walk
             sibling variants if the size doesn't match the seed."""
             try:
-                candidate = self._scrape_detail(url, sc)
+                candidate = self._scrape_detail(url, sc, seed_ean=product.ean)
             except Exception as e:  # noqa: BLE001
                 log.warning("Müller %s: detail fetch failed for %s: %s", sc.country_code, url, e)
                 return None
@@ -240,7 +240,7 @@ class MuellerSpider(Spider):
         best: Optional[tuple[float, ScrapedPrice]] = None
         for url in urls[:8]:
             try:
-                candidate = self._scrape_detail(url, sc)
+                candidate = self._scrape_detail(url, sc, seed_ean=product.ean)
             except Exception as e:  # noqa: BLE001
                 log.warning(
                     "Müller %s: bootstrap detail failed for %s: %s",
@@ -379,7 +379,9 @@ class MuellerSpider(Spider):
             out.append((full, size))
         return out
 
-    def _scrape_detail(self, url: str, sc: ShopCountry) -> Optional[ScrapedPrice]:
+    def _scrape_detail(
+        self, url: str, sc: ShopCountry, seed_ean: Optional[str] = None
+    ) -> Optional[ScrapedPrice]:
         res = self.fetcher.get(url)
         if res.status_code != 200 or not res.html:
             return None
@@ -425,6 +427,20 @@ class MuellerSpider(Spider):
         markant_str = str(markant_id) if markant_id is not None else None
         ean_candidates = _eans_from_jsonld_images(data.get("image"), markant_str)
         ean = next(iter(ean_candidates), None)  # take any — should be unique per page
+
+        # Branded-SKU exception: for manufacturer brands (Nivea, Dove, …) the
+        # JSON-LD `gtin` field carries the genuine GTIN, not a Markant article
+        # id — but then the image-filename extractor excludes it as a presumed
+        # Markant id and we end up with no EAN. When the gtin canonicalizes to
+        # exactly the seed EAN we are searching for AND is GS1 check-digit
+        # valid, trust it: equality with an independently verified seed EAN
+        # cannot be an article-id coincidence, and the pack-guard still gates.
+        if ean is None and markant_str and seed_ean:
+            gtin_canon = markant_str.lstrip("0") or "0"
+            if gtin_canon == (seed_ean.lstrip("0") or "0") and _is_valid_ean13(
+                markant_str.zfill(13)
+            ):
+                ean = gtin_canon
 
         image_val = data.get("image")
         if isinstance(image_val, list):

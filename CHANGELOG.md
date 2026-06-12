@@ -6,6 +6,18 @@ The project follows a loose pattern: features are commits; methodology promises 
 
 ---
 
+## 2026-06 — Precision audit, real cross-retailer verification, evidence archive, /report
+
+The round that makes the dataset presentable to an institutional reader. Theme: every number must survive a sceptical reviewer.
+
+- **Exact wages (migration 006).** Replaced approximate integer wages with exact Eurostat SES 2022 medians (`earn_ses_pub2s`, sex=T, unit=EUR, retrieved via the Eurostat API 2026-06-12): DE 19.39 · AT 17.65 · SI 10.47 · CZ 8.23 · HR 6.82 · HU 5.73 · PL 6.90 · SK 7.72 · RO 5.55 · BG 4.05 · IT 13.05 · CH 37.64. The approximations had been *flattering* the gap — headline ratios rose (micellar water 9.0× → **11.8×**; universal basket 5.2× → **6.6×**, 20 min DE vs 132 min BG). Wage vintage (2022) and its direction of bias are documented in METHODOLOGY.
+- **Legal facts corrected**: Romania VAT 19 % → **21 %** (Law 141/2025, effective 2025-08-01; reduced rate consolidated to 11 %); Bulgaria's currency label BGN → **EUR** (euro adoption 2026-01-01, fixed 1.95583; scraped BG rows were already observed in EUR). Slovakia's 23 % (2025-01-01) was already correct. All price rows postdate every change.
+- **Real cross-retailer verification.** Fixed the Müller spider for branded SKUs: their JSON-LD `gtin` *is* the genuine GTIN (not a Markant article id), so a candidate equal to the independently verified seed EAN is now trusted (check-digit-gated). Result: **4 branded products (Nivea Creme, Nivea deo, Garnier micellar, Schwarzkopf GLISS) observed at both DM and Müller — 8 country-cells, identical EANs, 0 disagreements** — plus first real Switzerland rows.
+- **Comparison-universe rules (`comparisonRows`)**: rankings/baskets/headlines now computed strictly from EU rows of one retailer per product (the widest-coverage one — DM). Second-retailer rows corroborate identity but can no longer supply min/max prices or double-count basket totals; Switzerland is display-only (`NON_EU_COUNTRIES`). This closed two real bugs the new Müller/CH rows would have introduced.
+- **Independent evidence archive (migration 007 + `scripts/archive_evidence.py`)**: product URLs are snapshotted at the Internet Archive's Wayback Machine; snapshot URL + timestamp stored in `evidence_archive`, exported to the web, and linked per row in every product page's sources table. Local SHA-256 HTML archive = parse-time evidence; Wayback snapshot = third-party dated proof. Incremental and idempotent — re-runs skip fresh snapshots.
+- **New `/report` page** — the case study for EU institutions, regenerated live from the dataset: executive summary, the claim in two independently verifiable layers (ex-VAT price discrimination on identical EANs; wage-time burden), identity rigor, precision-audited input table with sources, evidence trail, dual-quality context (Directive (EU) 2019/2161 — identical EANs make the "different quality" objection inapplicable here), territorial-supply-constraints policy framing, limitations stated plainly, citation block.
+- **Retailer #3 scoped**: Rossmann is bot-walled (deferred); Notino chosen — one platform across ~24 EU country shops, EANs verifiable from image filenames, no bot wall. Spider planned next round.
+
 ## 2026-05 — ≥4-country comparison floor + household category
 
 Sharpened what counts as a publishable comparison and grew the catalog with everyday household essentials.

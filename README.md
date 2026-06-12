@@ -14,8 +14,10 @@ This is directly relevant to **European Commission policy on territorial supply 
 
 - **33 cross-EU products tracked** across drugstore essentials (25), baby essentials (3), feminine hygiene (3), and household cleaning (2). Every product shown as a comparison has observations in **≥4 distinct EU countries** (the floor counts distinct countries, not rows). DM stocks 7 further branded SKUs only in DACH — these stay in the 40-SKU catalog for cross-retailer verification but are excluded from the cross-EU rankings.
 - All 40 catalog SKUs have verified EAN-13 codes, real product images, and canonical retailer URLs
-- **283 real cross-EU price observations** captured via Playwright scrapes of DM's 10 country sites — zero sample data, every row links to the actual retailer product page and stores the JSON-LD EAN that page exposed at scrape time
-- **2 retailers wired in**: DM Drogerie Markt (10 EU countries) + Müller (DE/AT/CH; HU/SI/CZ/IT seeded but disabled pending JS-rendering work). Switzerland adds a high-wage non-EU comparator.
+- **294 real price observations** (283 in the cross-EU comparison universe + 11 corroboration rows from a second retailer and Switzerland) captured via Playwright scrapes — zero sample data, every row links to the actual retailer product page and stores the JSON-LD EAN that page exposed at scrape time
+- **2 retailers with live cross-retailer verification**: DM Drogerie Markt (10 EU countries) + Müller (DE/AT/CH). **4 branded products (Nivea ×2, Garnier, Schwarzkopf) are now independently observed at both chains — 8 country-cells, identical EANs, 0 disagreements.** Switzerland adds a high-wage non-EU comparator (display-only; never enters cross-EU rankings). Notino (one platform, ~24 EU country shops) scoped as retailer #3.
+- **Precision-audited inputs (migration 006)**: exact Eurostat SES 2022 median hourly wages (`earn_ses_pub2s`, retrieved 2026-06-12 — DE 19.39 · BG 4.05 €/h, not approximations), VAT rates as legally in force (SK 23 % from 2025-01, RO 21 % from 2025-08), Bulgaria's euro adoption (2026-01-01) reflected.
+- **Independent evidence archive**: product URLs are snapshotted at the [Internet Archive](https://web.archive.org/) (`scripts/archive_evidence.py`) — third-party, dated proof of displayed prices, linked per row on every product page.
 - **External identity verification**: every EAN reconciled against [Open Beauty Facts](https://world.openbeautyfacts.org/) (8 confirmed · 4 stubs · 28 not catalogued · **0 disagreements**); cross-retailer EAN agreement script (`scripts/audit_cross_retailer.py`) automatically verifies DM↔Müller wherever shared coverage exists.
 - **6 products with FULL 10-country coverage** (every DM country observed): Balea Deo Roll-On Sensitive, Ebelin Wattepads, Ebelin Wattestäbchen Recycling, dontodent PRO+ Zahnpasta, dontodent Zahnbürste Soft Protect, dontodent Mundspülung Total Power
 - Per-country coverage (of 33 comparison products):
@@ -23,31 +25,31 @@ This is directly relevant to **European Commission policy on territorial supply 
 
 ### Headline findings (current scrape — top 15 by labor-time ratio)
 
-Same physical SKU, identical EAN-13, same retailer (DM). The "worktime" column is the price expressed as minutes of work at each country's median hourly wage (Eurostat `earn_ses_hourly`).
+Same physical SKU, identical EAN-13, same retailer (DM). The "worktime" column is the price expressed as minutes of work at each country's **exact** median hourly wage (Eurostat `earn_ses_pub2s`, SES 2022).
 
 | Product | Cheapest worktime | Most worktime | Ratio | Countries |
 |---|---|---|---|---|
-| Balea Mizellenwasser 3-in-1 Rose (400 ml) | 4 min (DE) | 36 min (BG) | **9.0×** | 9 |
-| dontodent Mundspülung Total Power (500 ml) | 2 min (DE) | 17 min (BG) | **7.2×** | 10 |
-| alverde Naturkosmetik Duschgel (250 ml shower gel) | 3 min (DE) | 20 min (BG) | **7.1×** | 7 |
-| alverde Feuchtigkeitsshampoo (200 ml) | 4 min (DE) | 25 min (BG) | **6.9×** | 9 |
-| Ebelin Wattestäbchen Recycling (200 pcs cotton swabs) | 3 min (DE) | 18 min (BG) | **6.9×** | 10 |
-| Balea Duschgel Glücksmoment (300 ml shower gel) | 2 min (DE) | 10 min (BG) | **6.5×** | 9 |
-| Balea Cremedusche Sensitive (300 ml shower gel) | 2 min (DE) | 10 min (BG) | **6.5×** | 7 |
-| Balea Deo Roll-On Sensitive (50 ml) | 2 min (DE) | 10 min (BG) | **6.1×** | 10 |
-| Balea Bodybalsam Sensitive (400 ml body lotion) | 3 min (AT) | 20 min (BG) | **6.0×** | 8 |
-| Jessa Tampons Cotton Super (16 pcs) | 5 min (DE) | 31 min (BG) | **5.8×** | 8 |
-| Balea Lippenpflege Lemon Cake (4.8 g lip balm) | 2 min (DE) | 10 min (BG) | **5.6×** | 8 |
-| Jessa Slipeinlagen Cotton Normal (40 panty liners) | 4 min (AT) | 20 min (BG) | **5.4×** | 8 |
-| Denkmit Allzweckreiniger Frühlingsmoment (1 l all-purpose cleaner) | 3 min (DE) | 14 min (BG) | **5.3×** | 8 |
-| dontodent Zahnbürste Soft Protect (toothbrush) | 2 min (DE) | 12 min (BG) | **5.2×** | 10 |
-| Nivea Creme (150 ml) | 8 min (DE) | 40 min (BG) | **5.2×** | 9 |
+| Balea Mizellenwasser 3-in-1 Rose (400 ml) | 4.5 min (DE) | 52.9 min (BG) | **11.8×** | 9 |
+| dontodent Mundspülung Total Power (500 ml) | 2.6 min (DE) | 24.9 min (BG) | **9.5×** | 10 |
+| alverde Naturkosmetik Duschgel (250 ml shower gel) | 3.2 min (DE) | 30.2 min (BG) | **9.3×** | 7 |
+| alverde Feuchtigkeitsshampoo (200 ml) | 4.2 min (DE) | 37.5 min (BG) | **9.0×** | 9 |
+| Ebelin Wattestäbchen Recycling (200 pcs cotton swabs) | 2.9 min (DE) | 26.4 min (BG) | **9.0×** | 10 |
+| Balea Duschgel Glücksmoment (300 ml shower gel) | 1.7 min (DE) | 14.4 min (BG) | **8.4×** | 9 |
+| Balea Cremedusche Sensitive (300 ml shower gel) | 1.7 min (DE) | 14.4 min (BG) | **8.4×** | 7 |
+| Balea Deo Roll-On Sensitive (50 ml) | 1.9 min (DE) | 14.8 min (BG) | **8.0×** | 10 |
+| Balea Bodybalsam Sensitive (400 ml body lotion) | 3.7 min (AT) | 29.2 min (BG) | **7.8×** | 8 |
+| Jessa Tampons Cotton Super (16 pcs) | 6.0 min (DE) | 45.3 min (BG) | **7.5×** | 8 |
+| Balea Lippenpflege Lemon Cake (4.8 g lip balm) | 2.0 min (DE) | 14.8 min (BG) | **7.4×** | 8 |
+| Jessa Slipeinlagen Cotton Normal (40 panty liners) | 4.2 min (AT) | 30.2 min (BG) | **7.1×** | 8 |
+| Denkmit Allzweckreiniger Frühlingsmoment (1 l all-purpose cleaner) | 2.9 min (DE) | 20.4 min (BG) | **7.0×** | 8 |
+| dontodent Zahnbürste Soft Protect (toothbrush) | 2.6 min (DE) | 17.8 min (BG) | **6.8×** | 10 |
+| Nivea Creme (150 ml) | 8.8 min (DE) | 59.4 min (BG) | **6.7×** | 9 |
 
-**Pattern.** Bulgaria holds the most-worktime slot in all 15 of the worst gaps; Germany holds the cheapest-worktime slot in 13 of 15 (Austria takes the other two). The same physical bottle of mouthwash that a German buys in 2 minutes of work costs a Bulgarian 17 minutes — for an identical EAN-13 SKU at the same retailer (DM), no exception, no fuzzy matching.
+**Pattern.** Bulgaria holds the most-worktime slot in all 15 of the worst gaps; Germany holds the cheapest-worktime slot in 13 of 15 (Austria takes the other two). The same physical bottle of mouthwash that a German buys in under 3 minutes of work costs a Bulgarian 25 minutes — for an identical EAN-13 SKU at the same retailer (DM), no exception, no fuzzy matching. (Ratios rose vs the previous README revision because approximate wages were replaced with exact Eurostat medians — the approximations had been flattering the gap.)
 
-**The babylove diaper case (#43) is the most consequential for ongoing household burden** — diapers are recurring (8–10 packs/month for an infant), so the 5.0× wage-time gap compounds into roughly 25 extra hours/year of work for a Bulgarian parent vs a German parent on identical product. With 9 countries observed, the diaper finding is robust to single-country anomalies.
+**The babylove diaper case (#43) is the most consequential for ongoing household burden** — diapers are recurring, so the 6.6× wage-time gap (17 min DE → 113 min BG per pack) compounds: at 8 packs/month, a Bulgarian parent works roughly **150 extra hours per year** vs a German parent for identical product. With 9 countries observed, the diaper finding is robust to single-country anomalies.
 
-**The Jessa feminine-hygiene findings (#67 Tampons Cotton Super: 5.8×, #66 Slipeinlagen: 5.4×)** introduce a parallel argument — essential, non-substitutable, recurring purchases punish women in lower-wage member states most heavily.
+**The Jessa feminine-hygiene findings (Tampons Cotton Super: 7.5×, Slipeinlagen: 7.1×)** introduce a parallel argument — essential, non-substitutable, recurring purchases punish women in lower-wage member states most heavily.
 
 ### The basket aggregate
 
@@ -55,18 +57,18 @@ Per-product findings can be dismissed as anecdotes; the basket aggregate cannot.
 
 | Country | Basket EUR (incl VAT) | Basket worktime |
 |---|---:|---:|
-| 🇩🇪 Germany    | €6.35 | **17 min** |
-| 🇦🇹 Austria    | €7.20 | 22 min |
-| 🇸🇮 Slovenia   | €8.20 | 38 min |
-| 🇨🇿 Czechia    | €8.33 | 45 min |
-| 🇭🇷 Croatia    | €7.75 | 46 min |
-| 🇵🇱 Poland     | €7.80 | 47 min |
-| 🇭🇺 Hungary    | €6.87 | 51 min |
-| 🇸🇰 Slovakia   | €8.00 | 53 min |
-| 🇷🇴 Romania    | €7.40 | 56 min |
-| 🇧🇬 Bulgaria   | €8.91 | **89 min** |
+| 🇩🇪 Germany    | €6.35 | **20 min** |
+| 🇦🇹 Austria    | €7.20 | 24 min |
+| 🇸🇮 Slovenia   | €8.20 | 47 min |
+| 🇨🇿 Czechia    | €8.32 | 61 min |
+| 🇸🇰 Slovakia   | €8.00 | 62 min |
+| 🇵🇱 Poland     | €7.82 | 68 min |
+| 🇭🇷 Croatia    | €7.75 | 68 min |
+| 🇭🇺 Hungary    | €6.68 | 70 min |
+| 🇷🇴 Romania    | €7.37 | 80 min |
+| 🇧🇬 Bulgaria   | €8.89 | **132 min** |
 
-**The same 6 daily essentials cost a German buyer 17 minutes of work and a Bulgarian buyer 89 minutes — 5.2× the labor time for the identical SKUs at the identical retailer.** A pairwise basket picker on `/basket` lets any two countries be compared on their own intersection (typically 13-25 products).
+**The same 6 daily essentials cost a German buyer 20 minutes of work and a Bulgarian buyer 132 minutes — 6.6× the labor time for the identical SKUs at the identical retailer.** A pairwise basket picker on `/basket` lets any two countries be compared on their own intersection (typically 13-25 products).
 
 ### How we keep the comparison honest
 
@@ -80,7 +82,7 @@ Per-product findings can be dismissed as anecdotes; the basket aggregate cannot.
 
 ### Other infrastructure
 
-- Country median wages and VAT rates seeded for all 10 countries (Eurostat `earn_ses_hourly`, 2026 Q1 VAT publications)
+- Country median wages and VAT rates for all tracked countries: exact Eurostat `earn_ses_pub2s` SES 2022 medians (retrieved 2026-06-12) and VAT rates as legally in force at scrape time
 - Italian retailer (Tigotà) scaffolded for IT↔SK comparison (spider implementation pending)
 - Both rendering backends wired: Playwright (default, free) and Jina Reader (paid alt)
 
@@ -92,7 +94,8 @@ Per-product findings can be dismissed as anecdotes; the basket aggregate cannot.
 | `/basket` | **Universal basket** + **pairwise basket** views with apples-to-apples country totals |
 | `/compare` | Wage-time-gap leaderboard ranked by `dearest_minutes / cheapest_minutes` |
 | `/map` | Interactive EU choropleth; switch metric (nominal EUR / ex-VAT / minutes-of-work) and product |
-| `/product/[id]` | Per-product breakdown — wage-time headline panel, per-country charts, sources table, **"Cite this finding"** block, social-share buttons |
+| `/product/[id]` | Per-product breakdown — wage-time headline panel, per-country charts, sources table with per-row **Internet Archive snapshot links**, **"Cite this finding"** block, social-share buttons |
+| `/report` | **The case study for EU institutions** — living report regenerated from the dataset on every visit: two-layer claim (ex-VAT price discrimination + wage-time burden), precision-audited inputs with sources, evidence trail, dual-quality context, TSC policy framing, limitations, citation block |
 | `/about` | Mission, methodology summary, press kit, sample citation, JSON dump link |
 
 Each page has a dynamically-rendered Open Graph card (`/opengraph-image`, `/basket/opengraph-image`, `/product/[id]/opengraph-image`) so social previews display the wage-time number, not a generic logo.

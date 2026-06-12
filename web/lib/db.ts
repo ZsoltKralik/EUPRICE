@@ -186,6 +186,26 @@ export async function listQuality(source?: string): Promise<QualityRow[]> {
   return source ? all.filter((q) => q.source === source) : all;
 }
 
+// Independent third-party evidence: newest Wayback Machine snapshot per
+// product URL. A snapshot documents the page on the SNAPSHOT date (which can
+// differ from a row's parse date) — UI must label that honestly.
+export type EvidenceRow = {
+  url: string;
+  archive_url: string;
+  snapshot_ts: string;   // YYYYMMDDhhmmss (UTC)
+  requested_at: string;
+};
+
+export async function evidenceByUrl(): Promise<Map<string, EvidenceRow>> {
+  const all = await load<EvidenceRow>("evidence.json");
+  return new Map(all.map((e) => [e.url, e]));
+}
+
+export function snapshotDate(ts: string): string {
+  // "20260612211431" -> "2026-06-12"
+  return `${ts.slice(0, 4)}-${ts.slice(4, 6)}-${ts.slice(6, 8)}`;
+}
+
 export type QualityRollup = {
   source: string;            // "obf"
   total: number;             // products checked

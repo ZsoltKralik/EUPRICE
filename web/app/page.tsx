@@ -5,6 +5,7 @@ import {
   buildFindings,
   buildUniversalBasket,
   basketHeadlineSentence,
+  NON_EU_COUNTRIES,
   type Finding,
   type Basket,
 } from "@/lib/findings";
@@ -48,7 +49,9 @@ export default async function Home({
   const findings = buildFindings(rows);
   const headline = findings.find((f) => f.minutes_ratio !== null);
   const universalBasket = buildUniversalBasket(rows);
-  const totalCountries = new Set(rows.map((r) => r.country_code)).size;
+  const totalCountries = new Set(
+    rows.filter((r) => !NON_EU_COUNTRIES.has(r.country_code)).map((r) => r.country_code),
+  ).size;
   const totalShops = new Set(rows.map((r) => r.shop_code)).size;
   const crossVerifiedCount = findings.filter((f) => f.cross_verified).length;
 
