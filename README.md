@@ -100,6 +100,20 @@ Per-product findings can be dismissed as anecdotes; the basket aggregate cannot.
 
 Each page has a dynamically-rendered Open Graph card (`/opengraph-image`, `/basket/opengraph-image`, `/product/[id]/opengraph-image`) so social previews display the wage-time number, not a generic logo.
 
+## Keeping the data fresh
+
+Drugstore prices move slowly — monthly is the right cadence. A refresh is a single command:
+
+```
+python scripts/refresh_all.py        # scrape → audit (quality gate) → archive → export → commit → push
+```
+
+The orchestrator runs the whole pipeline with a **hard quality gate**: after scraping it runs the pack-quality audit and, if any *fatal* class appears (wrong product / wrong size: `EAN_DIFF`, `CATEGORY`, `MULTI`, `SIZE`), it **aborts before the commit** so bad data is never published unattended. Informational `TOKEN_MISS` rows (localized names lacking German seed tokens — expected with EAN-anchored matching) do not block. Useful flags: `--no-push` (commit locally only), `--no-scrape` (re-audit/export/commit), `--no-archive` (skip the slow Wayback step), `--shops dm,mueller`, `--force`.
+
+Why unchanged prices are fine: every scrape **appends** a dated row to the price history, so a flat line is itself evidence that a gap is structural rather than a transient promo (the per-product page renders that history). Wayback snapshots accumulate over time into a dated trail.
+
+**Optional automation** (not enabled by default): `scripts/register_refresh_task.ps1` registers a Windows Scheduled Task ("EUPRICE Monthly Refresh") that runs `scripts/refresh_monthly.ps1` on the 1st of each month at 03:00, logging to `logs/`. It's opt-in because it commits and pushes unattended — run the register script yourself when you want it on.
+
 ## Documentation
 
 For the rigorous version of how this works:

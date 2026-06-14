@@ -108,10 +108,11 @@ A handful of essential SKUs failed the text-search bootstrap on DM Germany becau
 
 Workflow: query OBF or GS1 for the EAN by brand/product-name, paste it into `data/products.csv` directly, then re-scrape. This unlocks the categories the bootstrap couldn't reach (especially paper goods and Pampers — both heavily covered in EU consumer-price policy debates).
 
-### C.2 — Scheduled weekly scrape + drift detection
+### C.2 — Scheduled refresh + drift detection
 
-- GitHub Actions cron: one shop per night across 5 nights.
-- New `scripts/diff_scrape_runs.py`: compare the last two `scrape_run` records, flag rows where:
+- **✅ One-command refresh orchestrator (`scripts/refresh_all.py`)** — scrape → pack-quality **quality gate** (aborts the commit on any fatal EAN_DIFF/CATEGORY/MULTI/SIZE flag) → localize images → Wayback archive → export → commit → push. Unchanged prices simply extend the append-only price history.
+- **✅ Opt-in monthly scheduler** — `scripts/refresh_monthly.ps1` (logs to `logs/`) + `scripts/register_refresh_task.ps1` (registers the "EUPRICE Monthly Refresh" Windows task, 1st of month 03:00). Opt-in by design because it commits/pushes unattended; the operator runs the register script to enable it.
+- **Next — drift detection**: `scripts/diff_scrape_runs.py`: compare the last two `scrape_run` records, flag rows where:
   - the URL changed (SKU rotation)
   - the EAN changed (identity drift)
   - the price moved more than 20 % week-on-week (potential mis-match)

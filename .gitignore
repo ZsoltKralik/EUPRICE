@@ -30,3 +30,6 @@ data/snapshots/
 Thumbs.db
 .vscode/
 .idea/
+
+# Scheduled-refresh logs
+logs/
