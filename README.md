@@ -12,16 +12,16 @@ This is directly relevant to **European Commission policy on territorial supply 
 
 ## Status
 
-- **33 cross-EU products tracked** across drugstore essentials (25), baby essentials (3), feminine hygiene (3), and household cleaning (2). Every product shown as a comparison has observations in **≥4 distinct EU countries** (the floor counts distinct countries, not rows). DM stocks 7 further branded SKUs only in DACH — these stay in the 40-SKU catalog for cross-retailer verification but are excluded from the cross-EU rankings.
-- All 40 catalog SKUs have verified EAN-13 codes, real product images, and canonical retailer URLs
-- **294 real price observations** (283 in the cross-EU comparison universe + 11 corroboration rows from a second retailer and Switzerland) captured via Playwright scrapes — zero sample data, every row links to the actual retailer product page and stores the JSON-LD EAN that page exposed at scrape time
+- **39 cross-EU products tracked** across drugstore essentials (28), baby essentials (4), household cleaning (4), and feminine hygiene (3). Every product shown as a comparison has observations in **≥4 distinct EU countries** (the floor counts distinct countries, not rows). DM stocks 7 further branded SKUs only in DACH — these stay in the 46-SKU catalog for cross-retailer verification but are excluded from the cross-EU rankings.
+- All 46 catalog SKUs have verified EAN-13 codes, real product images, and canonical retailer URLs
+- **339 real price observations** captured via Playwright scrapes — zero sample data, every row links to the actual retailer product page and stores the JSON-LD EAN that page exposed at scrape time
 - **2 retailers with live cross-retailer verification**: DM Drogerie Markt (10 EU countries) + Müller (DE/AT/CH). **4 branded products (Nivea ×2, Garnier, Schwarzkopf) are now independently observed at both chains — 8 country-cells, identical EANs, 0 disagreements.** Switzerland adds a high-wage non-EU comparator (display-only; never enters cross-EU rankings). Notino (one platform, ~24 EU country shops) scoped as retailer #3.
 - **Precision-audited inputs (migration 006)**: exact Eurostat SES 2022 median hourly wages (`earn_ses_pub2s`, retrieved 2026-06-12 — DE 19.39 · BG 4.05 €/h, not approximations), VAT rates as legally in force (SK 23 % from 2025-01, RO 21 % from 2025-08), Bulgaria's euro adoption (2026-01-01) reflected.
 - **Independent evidence archive**: product URLs are snapshotted at the [Internet Archive](https://web.archive.org/) (`scripts/archive_evidence.py`) — third-party, dated proof of displayed prices, linked per row on every product page.
 - **External identity verification**: every EAN reconciled against [Open Beauty Facts](https://world.openbeautyfacts.org/) (8 confirmed · 4 stubs · 28 not catalogued · **0 disagreements**); cross-retailer EAN agreement script (`scripts/audit_cross_retailer.py`) automatically verifies DM↔Müller wherever shared coverage exists.
 - **6 products with FULL 10-country coverage** (every DM country observed): Balea Deo Roll-On Sensitive, Ebelin Wattepads, Ebelin Wattestäbchen Recycling, dontodent PRO+ Zahnpasta, dontodent Zahnbürste Soft Protect, dontodent Mundspülung Total Power
-- Per-country coverage (of 33 comparison products):
-  DE 32 · SK 32 · AT 31 · SI 29 · HR 28 · HU 27 · BG 27 · CZ 25 · RO 24 · PL 16
+- Per-country coverage (of 39 comparison products):
+  DE 38 · SK 36 · AT 36 · SI 34 · BG 33 · HR 32 · HU 31 · CZ 29 · RO 28 · PL 19
 
 ### Headline findings (current scrape — top 15 by labor-time ratio)
 
@@ -30,22 +30,22 @@ Same physical SKU, identical EAN-13, same retailer (DM). The "worktime" column i
 | Product | Cheapest worktime | Most worktime | Ratio | Countries |
 |---|---|---|---|---|
 | Balea Mizellenwasser 3-in-1 Rose (400 ml) | 4.5 min (DE) | 52.9 min (BG) | **11.8×** | 9 |
+| dontodent Zahnseide Antibakteriell (100 m dental floss) | 2.3 min (DE) | 23.7 min (BG) | **10.2×** | 7 |
 | dontodent Mundspülung Total Power (500 ml) | 2.6 min (DE) | 24.9 min (BG) | **9.5×** | 10 |
 | alverde Naturkosmetik Duschgel (250 ml shower gel) | 3.2 min (DE) | 30.2 min (BG) | **9.3×** | 7 |
 | alverde Feuchtigkeitsshampoo (200 ml) | 4.2 min (DE) | 37.5 min (BG) | **9.0×** | 9 |
 | Ebelin Wattestäbchen Recycling (200 pcs cotton swabs) | 2.9 min (DE) | 26.4 min (BG) | **9.0×** | 10 |
 | Balea Duschgel Glücksmoment (300 ml shower gel) | 1.7 min (DE) | 14.4 min (BG) | **8.4×** | 9 |
 | Balea Cremedusche Sensitive (300 ml shower gel) | 1.7 min (DE) | 14.4 min (BG) | **8.4×** | 7 |
+| Denkmit WC-Reiniger Ozeanfrische (1 l toilet cleaner) | 2.9 min (DE) | 23.7 min (HU) | **8.1×** | 9 |
 | Balea Deo Roll-On Sensitive (50 ml) | 1.9 min (DE) | 14.8 min (BG) | **8.0×** | 10 |
 | Balea Bodybalsam Sensitive (400 ml body lotion) | 3.7 min (AT) | 29.2 min (BG) | **7.8×** | 8 |
 | Jessa Tampons Cotton Super (16 pcs) | 6.0 min (DE) | 45.3 min (BG) | **7.5×** | 8 |
+| Balea Cremeseife Sensitive (500 ml hand soap) | 2.0 min (DE) | 15.1 min (BG) | **7.5×** | 8 |
 | Balea Lippenpflege Lemon Cake (4.8 g lip balm) | 2.0 min (DE) | 14.8 min (BG) | **7.4×** | 8 |
 | Jessa Slipeinlagen Cotton Normal (40 panty liners) | 4.2 min (AT) | 30.2 min (BG) | **7.1×** | 8 |
-| Denkmit Allzweckreiniger Frühlingsmoment (1 l all-purpose cleaner) | 2.9 min (DE) | 20.4 min (BG) | **7.0×** | 8 |
-| dontodent Zahnbürste Soft Protect (toothbrush) | 2.6 min (DE) | 17.8 min (BG) | **6.8×** | 10 |
-| Nivea Creme (150 ml) | 8.8 min (DE) | 59.4 min (BG) | **6.7×** | 9 |
 
-**Pattern.** Bulgaria holds the most-worktime slot in all 15 of the worst gaps; Germany holds the cheapest-worktime slot in 13 of 15 (Austria takes the other two). The same physical bottle of mouthwash that a German buys in under 3 minutes of work costs a Bulgarian 25 minutes — for an identical EAN-13 SKU at the same retailer (DM), no exception, no fuzzy matching. (Ratios rose vs the previous README revision because approximate wages were replaced with exact Eurostat medians — the approximations had been flattering the gap.)
+**Pattern.** Bulgaria holds the most-worktime slot in 14 of the 15 worst gaps (Hungary takes the toilet-cleaner top spot); Germany holds the cheapest-worktime slot in 13 of 15 (Austria takes the other two). The same dental floss a German buys in 2.3 minutes of work costs a Bulgarian 24 minutes — for an identical EAN-13 SKU at the same retailer (DM), no exception, no fuzzy matching. (Ratios use exact Eurostat SES 2022 wages.)
 
 **The babylove diaper case (#43) is the most consequential for ongoing household burden** — diapers are recurring, so the 6.6× wage-time gap (17 min DE → 113 min BG per pack) compounds: at 8 packs/month, a Bulgarian parent works roughly **150 extra hours per year** vs a German parent for identical product. With 9 countries observed, the diaper finding is robust to single-country anomalies.
 

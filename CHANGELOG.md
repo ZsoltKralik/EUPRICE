@@ -6,6 +6,15 @@ The project follows a loose pattern: features are commits; methodology promises 
 
 ---
 
+## 2026-06 — Catalog scale-up: +6 everyday essentials (39 cross-EU products)
+
+Catalog round focused on **essential, recurring household & personal-care items**, private-label-first (those reach the most DM countries, which the ≥4-country floor requires).
+
+- **+6 cross-EU products** (33 → 39 comparison products; 294 → 339 observations; 40 → 46 catalog SKUs):
+  Balea Cremeseife Sensitive (hand soap, 8 ctry, 7.5×), dontodent Zahnseide Antibakteriell (dental floss 100 m, 7 ctry, **10.2×** — 2nd-widest gap on the board), alverde Gesichtscreme Natural Expert LSF30 (face cream, 7 ctry), babylove Wundschutzcreme Ultra Sensitive (baby barrier cream, 6 ctry), Denkmit Weichspüler Ultra Sensitive (fabric softener, 8 ctry, 5.8×), Denkmit WC-Reiniger Ozeanfrische (toilet cleaner, 9 ctry, **8.1×** — first finding where Hungary, not Bulgaria, holds the dearest worktime).
+- **Data-quality discipline**: of 14 candidates added, 8 captured a confident DM-DE EAN; 6 were dropped rather than forced (intimate wash / dishwasher tabs / baby bath / 2nd toothpaste / toilet paper didn't resolve; a "Sensitive" micellar turned out to be the existing Rose SKU). Of the 8, two more (a DE-only face cream and a DE-only hair brush) were dropped for failing the ≥4-country floor with no cross-retailer path. Every surviving product shows a **single scraped EAN across all its countries**.
+- Caught a real seeding error via the audit: dontodent floss is sold as **100 m**, not the 50 m I seeded (metres aren't pack-guarded); renamed DB+CSV to the captured 100 m variant so the SIZE flag cleared. Final audit: **0 fatal flags across 339 rows.**
+
 ## 2026-06 — Precision audit, real cross-retailer verification, evidence archive, /report
 
 The round that makes the dataset presentable to an institutional reader. Theme: every number must survive a sceptical reviewer.
